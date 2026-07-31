@@ -1,8 +1,16 @@
-from config import API_TOKEN
+import os
+from dotenv import load_dotenv
 import telebot
 from telebot import apihelper
 
-bot = telebot.TeleBot(token=API_TOKEN)
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if BOT_TOKEN is None:
+    raise ValueError("BOT_TOKEN environment variable not found")
+
+bot = telebot.TeleBot(token=BOT_TOKEN)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
