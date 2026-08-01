@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="app-header">
+    <header class="app-header" id="app-header">
         <button type="button" id="filters-btn">Filters</button>
         <h2 class="app-title">MuseTwin</h2>
         <button type="button" id="report-btn">Report</button>
@@ -73,7 +73,36 @@
             <h3>My Profile</h3>
             <img src="../images/UserPhoto.png" alt="User profile photo">
             <h4>Daniil, 18</h4>
-            <p>Bio: Student, Software engineer, building project for people <3.</p>
+            <p>Bio: Student, Software engineer, building project for people &lt;3.</p>
+
+            <div class="music-stats">
+                <h4 class="music-stats-title">Playlist Genres</h4>
+
+                <div class="genre-row">
+                    <div class="genre-label"><span>Pop</span><span>38%</span></div>
+                    <div class="genre-bar"><div class="genre-fill" data-pct="38"></div></div>
+                </div>
+
+                <div class="genre-row">
+                    <div class="genre-label"><span>Hip-Hop</span><span>24%</span></div>
+                    <div class="genre-bar"><div class="genre-fill" data-pct="24"></div></div>
+                </div>
+
+                <div class="genre-row">
+                    <div class="genre-label"><span>Electronic</span><span>18%</span></div>
+                    <div class="genre-bar"><div class="genre-fill" data-pct="18"></div></div>
+                </div>
+
+                <div class="genre-row">
+                    <div class="genre-label"><span>Rock</span><span>12%</span></div>
+                    <div class="genre-bar"><div class="genre-fill" data-pct="12"></div></div>
+                </div>
+
+                <div class="genre-row">
+                    <div class="genre-label"><span>Jazz</span><span>8%</span></div>
+                    <div class="genre-bar"><div class="genre-fill" data-pct="8"></div></div>
+                </div>
+            </div>
         </section>
     </main>
 

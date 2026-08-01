@@ -8,6 +8,8 @@
     var tabSections = document.querySelectorAll('.tab-content');
     var distanceInput = document.getElementById('distance');
     var distanceSpan = document.getElementById('distance-value');
+    var genreFills = document.querySelectorAll('.genre-fill');
+    var appHeader = document.getElementById('app-header');
 
     function openModal() {
         filtersOverlay.classList.remove('hidden');
@@ -68,6 +70,33 @@
                 b.classList.remove('active');
             });
             btn.classList.add('active');
+
+            // header (title + Filters/Report) only shows on the Cards tab
+            if (appHeader) {
+                if (targetId === 'tab-cards') {
+                    appHeader.classList.remove('hidden');
+                } else {
+                    appHeader.classList.add('hidden');
+                }
+            }
+
+            // animate genre bars into view each time the Profile tab is opened
+            if (targetId === 'tab-profile') animateGenreBars();
         });
     });
+
+    // animate genre bars filling in from 0% to their target percentage
+    function animateGenreBars() {
+        genreFills.forEach(function(fill) {
+            fill.style.width = '0%';
+        });
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                genreFills.forEach(function(fill) {
+                    var pct = fill.getAttribute('data-pct') || '0';
+                    fill.style.width = pct + '%';
+                });
+            });
+        });
+    }
 })();
