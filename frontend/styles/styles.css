@@ -3,7 +3,10 @@
 */
 
 body     {
-    background-color: rgba(157, 139, 184, 0.636);
+    background-image: url("../images/background_new.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
 }
 
 .header {
@@ -25,9 +28,13 @@ body     {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     flex-direction: row;
     justify-content: space-between;
-    background-color: rgb(171, 150, 200);
-    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
-    /*box-shadow: inset 0 2px 5px rgba(132, 114, 156, 0.6);*/
+
+    background-image: url(../images/background_2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+
+    box-shadow: 0 0 10px rgba(118, 31, 149, 0.671);
 }
 
 .left-part {
@@ -41,9 +48,11 @@ body     {
     width: 75px;
     border-radius: 15px;
     border-width: 1px;
-    border-color: grey;
+    border-width: 0;
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
+    background-color: rgb(186, 214, 114);
+    box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
 }
 
 .Filters-Button:hover {
@@ -60,12 +69,14 @@ body     {
     width: 75px;
     border-radius: 15px;
     border-width: 1px;
-    border-color: grey;
+    border-width: 0;
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
     display: flex;
     align-items: center;
     gap: 2px;
+    background-color: rgb(186, 214, 114);
+    box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
 }
 
 .Report-Button:hover {
@@ -88,8 +99,15 @@ body     {
 }
 
 .App-name {
+    font-family: "BBH Bartle", sans-serif;
+    font-style: normal;
+    font-weight: 400;
     margin: 0;
+    color: rgb(191,191,102);
+    text-align: center;
 }
+
+
 /* 
 ------- > Main-part < --------
 */
@@ -109,14 +127,19 @@ body     {
     transform: translateY(-50%);
     width: 80px;
     height: auto;
-    background-color: rgb(161, 145, 184);
-    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
+
+    background-image: url(../images/background_2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+
     border-radius: 15px;
     padding: 20px 0;
     z-index: 100;
     display: flex;
     flex-direction: column;
     align-items: center;
+    box-shadow: 0 0 10px rgba(118, 31, 149, 0.671);
 }
 
 .User-photo-card {
@@ -132,14 +155,30 @@ body     {
     margin: 15px auto 0;
     margin-bottom: 0px;
     overflow: hidden;
+    box-shadow: 0 0 10px rgba(194, 44, 248, 0.671);
 }
 
 .User-name {
-    font-size: 15px;
-    font-family: Arial;
+    font-size: 18px;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
     color: rgb(193, 191, 191);
     margin-left: 15px;
+    margin-bottom: 0;
 
+}
+
+.Text-from-User {
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 15px;
+    color: rgb(193, 191, 191);
+    margin-left: 15px;
+    margin-top: 2px;
 }
 
 .Box-for-text {
@@ -147,7 +186,7 @@ body     {
     background-color: rgba(0, 0, 0, 0.562);
     bottom: 0;
     width: 400px;
-    height: 75px;
+    height: 80px;
 }
 
 .Photo-of-User {
@@ -160,13 +199,21 @@ body     {
 }
 
 .Users-music-stats {
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 16px;
     margin: 15px auto 0;
-    background-color: lightgoldenrodyellow;
+    background-color: rgba(176, 163, 193, 0.771);
     display: flex;
     flex-direction: row;
+    align-items: center;
+    border-width: 0;
     height: 125px;
     width: 385px;
     border-radius: 15px;
+    box-shadow: 0 0 10px rgba(194, 44, 248, 0.671);
 }
 /*
 -------- > Sidebar <------
@@ -191,12 +238,14 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
     margin: 0;
 
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
+    background-color: rgb(162, 30, 105);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Chat-button {
@@ -205,12 +254,14 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
     margin: 0px;
 
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
+    background-color: rgb(162, 30, 105);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Skip-button {
@@ -219,12 +270,14 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
     margin: 0;
 
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
+    background-color: rgb(162, 30, 105);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Like-button:hover, 
@@ -260,8 +313,13 @@ body     {
     align-items: center;
     justify-content: space-between;
     height: 75px;
-    background-color: rgb(171, 150, 200);
-    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
+
+    background-image: url(../images/background_2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+
+    box-shadow: 0 0 10px rgba(118, 31, 149, 0.671);
     border-radius: 15px;
     padding:0 10px;
 }
@@ -274,8 +332,10 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
+    background-color: rgba(210, 54, 142, 0.699);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Chats-page {
@@ -284,8 +344,10 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
+    background-color: rgba(210, 54, 142, 0.699);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Profile-page {
@@ -296,26 +358,44 @@ body     {
 
     border-width: 0.5px;
     border-style: solid;
-    border-color: lightslategrey;
+    border-width: 0;
     border-radius: 20px;
+    background-color: rgba(210, 54, 142, 0.699);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
+}
+
+.Likes-page {
+
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-width: 0;
+    border-radius: 20px;
+    background-color: rgba(210, 54, 142, 0.699);
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
 .Main-page, 
 .Profile-page, 
-.Chats-page {
+.Chats-page,
+.Likes-page{
     cursor: pointer;
     transition: all 0.15s  ease-in-out;
 }
 
 .Main-page:hover, 
 .Profile-page:hover, 
-.Chats-page:hover {
+.Chats-page:hover,
+.Likes-page:hover {
     transform: scale(0.87);
 }
 
 .Main-page:active,
 .Profile-page:active,
-.Chats-page:active {
+.Chats-page:active,
+.Likes-page:active {
     opacity: 0.55;
 }
 
@@ -352,8 +432,6 @@ body     {
     .User-name {
         font-size: 18px;
         margin-left: 0;
-        color: white;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.8);
     }
     .Users-music-stats {
         width: 100%;
@@ -371,7 +449,6 @@ body     {
         transform: translateY(-50%);
         padding: 25px 0;
         gap: 18px;
-        background-color: aliceblue;
         border-radius: 15px;
         z-index: 150;
     }
@@ -388,8 +465,6 @@ body     {
         margin-top: 0;
         font-size: 13px;
         border-radius: 15px;
-        border: 1px solid #aaa;
-        background: white;
         cursor: pointer;
     }
     .sidebar-buttons {
@@ -413,13 +488,11 @@ body     {
     }
     .footer-buttons {
         height: 70px;
-        background-color: aliceblue;
         border-radius: 20px;
         padding: 0 15px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     .Main-page,
     .Chats-page,
@@ -427,8 +500,6 @@ body     {
         height: 50px;
         width: 55px;
         border-radius: 20px;
-        border: 1px solid lightslategrey;
-        background: white;
         cursor: pointer;
         font-size: 12px;
         display: flex;
