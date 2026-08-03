@@ -230,3 +230,9 @@ body {
 .nav-btn.active { color: #222; background: #eceef1; }
 .nav-btn:hover { transform: translateY(-1px); }
 .nav-btn:active { background: #d5d8dd; transform: translateY(0); }
+
+
+.text-test {
+  font-family: "Bitcount Prop Single";
+  font-size: 25px;
+}

@@ -1,0 +1,509 @@
+/* 
+------- > Header-part < --------
+*/
+
+body     {
+    background-color: rgba(157, 139, 184, 0.636);
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 70px;
+}
+
+.Header-box {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 450px;
+    height: 70px;
+    padding: 0 20px;
+    border-radius: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-direction: row;
+    justify-content: space-between;
+    background-color: rgb(171, 150, 200);
+    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
+    /*box-shadow: inset 0 2px 5px rgba(132, 114, 156, 0.6);*/
+}
+
+.left-part {
+    align-items: center;
+    display: flex;
+}
+
+.Filters-Button {
+    margin: 0;
+    height: 33px;
+    width: 75px;
+    border-radius: 15px;
+    border-width: 1px;
+    border-color: grey;
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+}
+
+.Filters-Button:hover {
+    transform: scale(0.87);
+}
+
+.Filters-Button:active {
+    opacity: 0.65;
+}
+
+.Report-Button {
+    margin: 0;
+    height: 33px;
+    width: 75px;
+    border-radius: 15px;
+    border-width: 1px;
+    border-color: grey;
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.Report-Button:hover {
+    transform: scale(0.87);
+}
+
+.Report-Button:active {
+    opacity: 0.65;
+}
+
+.middle-part {
+    flex: 1;
+    align-items: center;
+    display: flex;
+    justify-content: center;
+}
+.right-part {
+    align-items: center;
+    display: flex;
+}
+
+.App-name {
+    margin: 0;
+}
+/* 
+------- > Main-part < --------
+*/
+
+.Main-box {
+    display: block;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+
+}
+
+.side-bar {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 80px;
+    height: auto;
+    background-color: rgb(161, 145, 184);
+    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
+    border-radius: 15px;
+    padding: 20px 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.User-photo-card {
+    position: relative;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-right: 10px;
+    width: 375px;
+    height: 325px;
+    border-radius: 15px;
+    margin: 15px auto 0;
+    margin-bottom: 0px;
+    overflow: hidden;
+}
+
+.User-name {
+    font-size: 15px;
+    font-family: Arial;
+    color: rgb(193, 191, 191);
+    margin-left: 15px;
+
+}
+
+.Box-for-text {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.562);
+    bottom: 0;
+    width: 400px;
+    height: 75px;
+}
+
+.Photo-of-User {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    display: block;
+
+}
+
+.Users-music-stats {
+    margin: 15px auto 0;
+    background-color: lightgoldenrodyellow;
+    display: flex;
+    flex-direction: row;
+    height: 125px;
+    width: 385px;
+    border-radius: 15px;
+}
+/*
+-------- > Sidebar <------
+*/
+
+.sidebar-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.sidebar-user_photo {
+    height: 55px;
+    width: 55px;
+    border-radius: 25px;
+}
+
+.Like-button {
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+    margin: 0;
+
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+}
+
+.Chat-button {
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+    margin: 0px;
+
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+}
+
+.Skip-button {
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+    margin: 0;
+
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+}
+
+.Like-button:hover, 
+.Skip-button:hover,
+.Chat-button:hover {
+    transform: scale(0.87);
+}
+
+.Like-button:active, 
+.Skip-button:active,
+.Chat-button:active {
+    opacity: 0.55;
+}
+
+
+/* 
+------- > Footer-part < --------
+*/
+
+
+.Choose-page-box {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40vw;
+    max-width: 500px;
+    height: 75px;
+}
+
+.footer-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 75px;
+    background-color: rgb(171, 150, 200);
+    box-shadow: 0 2px 20px rgba(132, 114, 156, 0.6);
+    border-radius: 15px;
+    padding:0 10px;
+}
+
+.Main-page {
+    margin-left: 45px;
+
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+}
+
+.Chats-page {
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+}
+
+.Profile-page {
+    margin-right: 45px;
+
+    height: 50px;
+    width: 55px;
+
+    border-width: 0.5px;
+    border-style: solid;
+    border-color: lightslategrey;
+    border-radius: 20px;
+}
+
+.Main-page, 
+.Profile-page, 
+.Chats-page {
+    cursor: pointer;
+    transition: all 0.15s  ease-in-out;
+}
+
+.Main-page:hover, 
+.Profile-page:hover, 
+.Chats-page:hover {
+    transform: scale(0.87);
+}
+
+.Main-page:active,
+.Profile-page:active,
+.Chats-page:active {
+    opacity: 0.55;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding-bottom: 0;
+    }
+    .Main-box {
+        padding-right: 90px;
+        padding-bottom: 90px;
+        box-sizing: border-box;
+    }
+    .User-photo-card {
+        width: 100%;
+        max-width: 100%;
+        height: 55vh;
+        margin: 15px auto 0;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    .Photo-of-User {
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .Box-for-text {
+        height: 80px;
+        bottom: 0;
+        width: 100%;
+        padding: 10px 15px;
+        box-sizing: border-box;
+    }
+    .User-name {
+        font-size: 18px;
+        margin-left: 0;
+        color: white;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+    .Users-music-stats {
+        width: 100%;
+        max-width: 100%;
+        min-height: 20vh;
+        margin: 15px auto 0;
+        box-sizing: border-box;
+        padding: 15px;
+        border-radius: 15px;
+    }
+    .side-bar {
+        width: 70px;
+        right: 10px;
+        top: 45%;
+        transform: translateY(-50%);
+        padding: 25px 0;
+        gap: 18px;
+        background-color: aliceblue;
+        border-radius: 15px;
+        z-index: 150;
+    }
+    .sidebar-user_photo {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+    }
+    .Like-button,
+    .Chat-button,
+    .Skip-button {
+        width: 52px;
+        height: 48px;
+        margin-top: 0;
+        font-size: 13px;
+        border-radius: 15px;
+        border: 1px solid #aaa;
+        background: white;
+        cursor: pointer;
+    }
+    .sidebar-buttons {
+        margin-left: 0;
+        margin-top: 0;
+        gap: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .Choose-page-box {
+        width: 90vw;
+        max-width: 450px;
+        height: auto;
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 200;
+        background: transparent;
+    }
+    .footer-buttons {
+        height: 70px;
+        background-color: aliceblue;
+        border-radius: 20px;
+        padding: 0 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .Main-page,
+    .Chats-page,
+    .Profile-page {
+        height: 50px;
+        width: 55px;
+        border-radius: 20px;
+        border: 1px solid lightslategrey;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .Main-page {
+        margin-left: 0;
+    }
+    .Profile-page {
+        margin-right: 0;
+    }
+}
+@media (max-width: 480px) {
+    body {
+        padding-bottom: 0;
+    }
+    .Main-box {
+        padding-right: 70px;
+        padding-bottom: 80px;
+    }
+    .User-photo-card {
+        height: 50vh;
+    }
+    .Users-music-stats {
+        min-height: 18vh;
+    }
+    .side-bar {
+        width: 60px;
+        right: 5px;
+        top: 40%;
+        padding: 18px 0;
+        gap: 14px;
+    }
+    .sidebar-user_photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
+    .Like-button,
+    .Chat-button,
+    .Skip-button {
+        width: 44px;
+        height: 40px;
+        font-size: 11px;
+    }
+    .Choose-page-box {
+        width: 95vw;
+        bottom: 8px;
+    }
+    .footer-buttons {
+        height: 65px;
+        padding: 0 12px;
+    }
+    .Main-page,
+    .Chats-page,
+    .Profile-page {
+        height: 44px;
+        width: 48px;
+        font-size: 10px;
+    }
+    .Box-for-text {
+        height: 70px;
+        padding: 8px 12px;
+    }
+    .User-name {
+        font-size: 16px;
+    }
+}
+
+/*
+------> ICONS <-----
+*/
+
+.report-icon {
+    width: 17px;
+    height: 17px;
+}
