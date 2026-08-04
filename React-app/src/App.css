@@ -2,8 +2,18 @@
 ------- > Header-part < --------
 */
 
-body     {
-    background-image: url("../images/background_new.png");
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+body    {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background-image: url("/background_new.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
@@ -31,7 +41,7 @@ body     {
     flex-direction: row;
     justify-content: space-between;
 
-    background-image: url(../images/background_2.png);
+    background-image: url("/background_2.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
@@ -45,6 +55,7 @@ body     {
 }
 
 .Filters-Button {
+    color: black;
     margin: 0;
     height: 33px;
     width: 75px;
@@ -70,6 +81,7 @@ body     {
 }
 
 .Report-Button {
+    color: black;
     margin: 0;
     height: 33px;
     width: 75px;
@@ -134,7 +146,7 @@ body     {
     width: 80px;
     height: auto;
 
-    background-image: url(../images/background_2.png);
+    background-image: url("/background_2.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
@@ -207,6 +219,7 @@ body     {
 }
 
 .Users-music-stats {
+    color: black;
     font-family: "Oswald", sans-serif;
     font-optical-sizing: auto;
     font-weight: normal;
@@ -328,7 +341,7 @@ body     {
     justify-content: space-between;
     height: 75px;
 
-    background-image: url(../images/background_2.png);
+    background-image: url("/background_2.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
