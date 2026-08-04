@@ -7,6 +7,8 @@ body     {
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
+
+    user-select: none;
 }
 
 .header {
@@ -53,6 +55,10 @@ body     {
     transition: all 0.15s  ease-in-out;
     background-color: rgb(186, 214, 114);
     box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
+
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .Filters-Button:hover {
@@ -74,7 +80,7 @@ body     {
     transition: all 0.15s  ease-in-out;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     background-color: rgb(186, 214, 114);
     box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
 }
@@ -179,6 +185,8 @@ body     {
     color: rgb(193, 191, 191);
     margin-left: 15px;
     margin-top: 2px;
+
+    user-select: text;
 }
 
 .Box-for-text {
@@ -214,6 +222,8 @@ body     {
     width: 385px;
     border-radius: 15px;
     box-shadow: 0 0 10px rgba(194, 44, 248, 0.671);
+
+    user-select: text;
 }
 /*
 -------- > Sidebar <------
@@ -284,12 +294,16 @@ body     {
 .Skip-button:hover,
 .Chat-button:hover {
     transform: scale(0.87);
+    box-shadow: inset 0 0 30px rgba(244, 40, 156, 0.915);
+    box-shadow: 0 0 35px rgba(255, 0, 144, 0.853);
 }
 
 .Like-button:active, 
 .Skip-button:active,
 .Chat-button:active {
     opacity: 0.55;
+    box-shadow: inset 0 0 0;
+    box-shadow: 0 0 50px rgba(242, 242, 18, 0.708);
 }
 
 
@@ -390,6 +404,8 @@ body     {
 .Chats-page:hover,
 .Likes-page:hover {
     transform: scale(0.87);
+    box-shadow: inset 0 0 30px rgba(244, 40, 156, 0.915);
+    box-shadow: 0 0 35px rgba(255, 0, 144, 0.853);
 }
 
 .Main-page:active,
@@ -397,6 +413,8 @@ body     {
 .Chats-page:active,
 .Likes-page:active {
     opacity: 0.55;
+    box-shadow: inset 0 0 0;
+    box-shadow: 0 0 50px rgba(242, 242, 18, 0.708);
 }
 
 @media (max-width: 768px) {
@@ -574,7 +592,13 @@ body     {
 ------> ICONS <-----
 */
 
-.report-icon {
+.report-icon,
+.filter-icon {
     width: 17px;
-    height: 17px;
+}
+
+.like-icon,
+.chat-icon,
+.skip-icon {
+    width: 22px;
 }
