@@ -14,7 +14,7 @@ function App() {
         <div className="Header-box">
             <div className="left-part">
                 <button className="Filters-Button">
-                    <img src="/list.svg" alt="" className="filter-icon" />
+                    <img src="list.svg" alt="" className="filter-icon" />
                     Filters
                 </button>
             </div>
@@ -25,7 +25,7 @@ function App() {
             </div>
             <div className="right-part">
                 <button className="Report-Button">
-                    <img src="/danger.svg" alt="" className="report-icon" />
+                    <img src="danger.svg" alt="" className="report-icon" />
                     Report
                 </button>
             </div>
@@ -35,7 +35,7 @@ function App() {
         <div className="Main-box">
             <div className="User-full-card">
                 <div className="User-photo-card">
-                    <img src="/UserCard.png" alt="User-photo" className="Photo-of-User" />
+                    <img src="UserCard.png" alt="User-photo" className="Photo-of-User" />
                     <div className="Box-for-text">
                         <h4 className="User-name">Igor Colomoyski, 27</h4>
                         <h5 className="Text-from-User">I`m just cool ukrainian guy</h5>
@@ -47,15 +47,15 @@ function App() {
             </div>
             <div className="side-bar">
                 <div className="sidebar-buttons">
-                    <img src="../public/UserPhoto.png" alt="User-Photo" className="sidebar-user_photo" />
+                    <img src="UserPhoto.png" alt="User-Photo" className="sidebar-user_photo" />
                     <button className="Like-button">
-                        <img src="../public/user-add.svg" alt="" className="like-icon" />
+                        <img src="user-add.svg" alt="" className="like-icon" />
                     </button>
                     <button className="Chat-button">
-                        <img src="../public/chat-icon-png.png" alt="" className="chat-icon" />
+                        <img src="chat-icon-png.png" alt="" className="chat-icon" />
                     </button>
                     <button className="Skip-button">
-                        <img src="../public/skip-button.svg" alt="" className="skip-icon" />
+                        <img src="skip-button.svg" alt="" className="skip-icon" />
                     </button>
                 </div>
             </div>
@@ -65,16 +65,16 @@ function App() {
     <footer className="Choose-page-box">
         <div className="footer-buttons">
             <button className="Main-page">
-                <img src="../public/home.svg" alt="" />
+                <img src="home.svg" alt="" />
             </button>
             <button className="Likes-page">
-                <img src="../public/heart.svg" alt="" />
+                <img src="heart.svg" alt="" />
             </button>
             <button className="Chats-page">
-                <img src="../public/mail.svg" alt="" />
+                <img src="mail.svg" alt="" />
             </button>
             <button className="Profile-page">
-                <img src="../public/smile.svg" alt="" />
+                <img src="smile.svg" alt="" />
             </button>
         </div>
     </footer>
