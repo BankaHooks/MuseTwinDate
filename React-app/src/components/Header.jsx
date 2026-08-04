@@ -1,4 +1,4 @@
-function Header ({ onFilterClick }) {
+function Header ({ onFilterClick, onReportClick }) {
     const base = import.meta.env.BASE_URL || '/';
     return (
         <header className="header">
@@ -22,7 +22,7 @@ function Header ({ onFilterClick }) {
                 </h2>            
             </div>
             <div className="right-part">
-                <button className="Report-Button">
+                <button className="Report-Button" onClick={onReportClick}>
                     <img src={base + "danger.svg"} alt="" className="report-icon" />
                     Report
                 </button>

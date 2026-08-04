@@ -5,6 +5,7 @@ import UserCard from '../components/UserCard';
 import UserStats from '../components/UserStats';
 import Sidebar from '../components/Sidebar';
 import Footer from '../components/Footer';
+import ReportModal from '../components/filters/ReportModal';
 
 const Home = () => {
     const base = import.meta.env.BASE_URL || '/';
@@ -16,7 +17,6 @@ const Home = () => {
         photo: base + "UserCard.png",
     };
 
-    // Состояние фильтров
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [filters, setFilters] = useState({
         gender: 'everyone',
@@ -33,6 +33,18 @@ const Home = () => {
         setIsFilterOpen(false);
     };
 
+    const [isReportOpen, setIsReportOpen] = useState(false);
+
+    const openReport = () => setIsReportOpen(true);
+    const closeReport = () => setIsReportOpen(false);
+
+    const sendReport = (reason) => {
+        console.log('Report reason' , reason)
+        //Send to server - later
+        closeReport();
+    };
+
+
     return (
         <div className="app" style={{
             backgroundImage: `url(${base}background_new.png)`,
@@ -41,7 +53,8 @@ const Home = () => {
             minHeight: '100vh',
             backgroundRepeat: 'no-repeat'
         }}>
-            <Header onFilterClick={openFilter} />
+            <Header onFilterClick={openFilter} onReportClick={openReport} />
+            
 
             <div id="main-page" className="page">
                 <div className="Main-box">
@@ -60,6 +73,12 @@ const Home = () => {
                 onClose={closeFilter}
                 onApply={applyFilters}
                 initialFilters={filters}
+            />
+
+            <ReportModal
+                isOpen={isReportOpen}
+                onClose={closeReport}
+                onApply={sendReport}
             />
         </div>
     );
