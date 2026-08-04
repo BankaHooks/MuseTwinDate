@@ -168,7 +168,7 @@ body    {
     gap: 20px;
     padding-right: 10px;
     width: 375px;
-    height: 325px;
+    height: 450px;
     border-radius: 15px;
     margin: 15px auto 0;
     margin-bottom: 0px;
@@ -231,7 +231,7 @@ body    {
     flex-direction: row;
     align-items: center;
     border-width: 0;
-    height: 125px;
+    height: 200px;
     width: 385px;
     border-radius: 15px;
     box-shadow: 0 0 10px rgba(194, 44, 248, 0.671);
