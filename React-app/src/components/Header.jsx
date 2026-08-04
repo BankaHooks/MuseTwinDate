@@ -1,4 +1,4 @@
-function Header () {
+function Header ({ onFilterClick }) {
     const base = import.meta.env.BASE_URL || '/';
     return (
         <header className="header">
@@ -8,7 +8,10 @@ function Header () {
             backgroundPosition: 'center',
           }}>
             <div className="left-part">
-                <button className="Filters-Button">
+                <button 
+                className="Filters-Button"
+                onClick={onFilterClick}
+                >
                     <img src={base + "list.svg"} alt="" className="filter-icon" />
                     Filters
                 </button>

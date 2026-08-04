@@ -1,0 +1,219 @@
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: linear-gradient(145deg, #2a1a3a, #1a0f2a);
+    background-image: url("background_2.png");
+    background-size: cover;
+    background-position: center;
+    border-radius: 20px;
+    padding: 24px 28px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 0 25px rgba(162, 30, 105, 0.8), 0 0 15px rgba(118, 31, 149, 0.6);
+    border: 1px solid rgba(186, 214, 114, 0.3);
+    position: relative;
+    color: #fff;
+}
+
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #fff;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: #f0c;
+}
+
+.filter-modal {
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.filter-modal h3 {
+    font-size: 24px;
+    margin: 0 0 20px 0;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
+    text-align: center;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.filter-group {
+    margin-bottom: 18px;
+}
+
+.filter-group label {
+    display: block;
+    font-weight: 400;
+    font-size: 16px;
+    color: #f0e6f6;
+    margin-bottom: 6px;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.radio-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 300;
+    font-size: 15px;
+    color: #e0d0e8;
+    cursor: pointer;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.radio-group input[type="radio"] {
+    accent-color: #ba6d4a;
+}
+
+.range-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.range-row input[type="number"] {
+    width: 65px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 16px;
+    backdrop-filter: blur(4px);
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.range-row input[type="number"]:focus {
+    outline: none;
+    border-color: #f0c;
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.8);
+}
+
+.filter-group input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 16px;
+    backdrop-filter: blur(4px);
+    box-sizing: border-box;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.filter-group input[type="text"]:focus {
+    outline: none;
+    border-color: #f0c;
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.8);
+}
+
+.filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.btn-cancel,
+.btn-apply {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 15px;
+    font-family: "Oswald", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 16px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-cancel {
+    background: rgb(186, 214, 114);
+    color: #000;
+    box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
+}
+
+.btn-cancel:hover {
+    transform: scale(0.9);
+    box-shadow: 0 0 20px rgba(255, 255, 135, 0.9);
+}
+
+.btn-cancel:active {
+    opacity: 0.65;
+}
+
+.btn-apply {
+    background: rgb(162, 30, 105);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
+}
+
+.btn-apply:hover {
+    transform: scale(0.9);
+    box-shadow: 0 0 25px rgba(244, 40, 156, 0.9);
+}
+
+.btn-apply:active {
+    opacity: 0.55;
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 16px 18px;
+    }
+    .filter-modal h3 {
+        font-size: 20px;
+    }
+    .btn-cancel,
+    .btn-apply {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+}
