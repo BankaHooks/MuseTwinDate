@@ -25,7 +25,10 @@ const Home = () => {
         city: "Taganrog",
     });
 
-    const openFilter = () => setIsFilterOpen(true);
+    const openFilter = () => {
+        console.log('OPEN_FILTER');
+        setIsFilterOpen(true);
+    };
     const closeFilter = () => setIsFilterOpen(false);
 
     const applyFilters = (newFilters) => {
@@ -35,7 +38,10 @@ const Home = () => {
 
     const [isReportOpen, setIsReportOpen] = useState(false);
 
-    const openReport = () => setIsReportOpen(true);
+    const openReport = () => {
+        console.log('OPEN_REPORT');
+        setIsReportOpen(true);
+    };
     const closeReport = () => setIsReportOpen(false);
 
     const sendReport = (reason) => {
