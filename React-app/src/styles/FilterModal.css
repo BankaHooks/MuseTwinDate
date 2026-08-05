@@ -13,7 +13,7 @@
 
 .modal-content {
     background: linear-gradient(145deg, #2a1a3a, #1a0f2a);
-    background-image: url("background_2.png");
+    background-image: url("filter-report-back.png");
     background-size: cover;
     background-position: center;
     border-radius: 20px;
@@ -23,7 +23,7 @@
     box-shadow: 0 0 25px rgba(162, 30, 105, 0.8), 0 0 15px rgba(118, 31, 149, 0.6);
     border: 1px solid rgba(186, 214, 114, 0.3);
     position: relative;
-    color: #fff;
+    color: rgb(191,191,102);
 }
 
 .modal-close {
@@ -34,7 +34,7 @@
     border: none;
     font-size: 28px;
     cursor: pointer;
-    color: #fff;
+    color: rgb(191,191,102);
     transition: color 0.2s;
 }
 
@@ -52,7 +52,7 @@
 .filter-modal h3 {
     font-size: 24px;
     margin: 0 0 20px 0;
-    color: #fff;
+    color: rgb(191,191,102);
     text-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
     text-align: center;
     font-family: "Oswald", sans-serif;
@@ -69,7 +69,7 @@
     display: block;
     font-weight: 400;
     font-size: 16px;
-    color: #f0e6f6;
+    color: rgb(191,191,102);
     margin-bottom: 6px;
     font-family: "Oswald", sans-serif;
     font-optical-sizing: auto;
@@ -89,7 +89,7 @@
     gap: 6px;
     font-weight: 300;
     font-size: 15px;
-    color: #e0d0e8;
+    color: rgb(191,191,102);
     cursor: pointer;
     font-family: "Oswald", sans-serif;
     font-optical-sizing: auto;
@@ -113,7 +113,7 @@
     border-radius: 10px;
     border: 1px solid #ccc;
     background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    color: rgb(191,191,102);
     font-size: 16px;
     backdrop-filter: blur(4px);
     font-family: "Oswald", sans-serif;
@@ -134,7 +134,7 @@
     border-radius: 10px;
     border: 1px solid #ccc;
     background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    color: rgb(191,191,102);
     font-size: 16px;
     backdrop-filter: blur(4px);
     box-sizing: border-box;
@@ -176,7 +176,7 @@
 
 .btn-cancel {
     background: rgb(186, 214, 114);
-    color: #000;
+    color: white;
     box-shadow: 0 0 10px rgba(255, 255, 135, 0.6);
 }
 
@@ -191,7 +191,7 @@
 
 .btn-apply {
     background: rgb(162, 30, 105);
-    color: #fff;
+    color: white;
     box-shadow: 0 0 10px rgba(162, 30, 105, 0.6);
 }
 
