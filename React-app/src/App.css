@@ -450,6 +450,11 @@ body    {
         padding-bottom: 90px;
         box-sizing: border-box;
     }
+
+    .App-name {
+        font-size: 16px;
+    }
+
     .User-photo-card {
         width: 100%;
         max-width: 100%;
@@ -563,6 +568,11 @@ body    {
         padding-right: 70px;
         padding-bottom: 80px;
     }
+
+    .App-name {
+        font-size: 15px;
+    }
+
     .User-photo-card {
         height: 50vh;
     }

@@ -6,6 +6,7 @@ import UserStats from '../components/UserStats';
 import Sidebar from '../components/Sidebar';
 import Footer from '../components/Footer';
 import ReportModal from '../components/filters/ReportModal';
+import { BrowserRouter, Routes, Route, Link} from 'react-router-dom';
 
 const Home = () => {
     const base = import.meta.env.BASE_URL || '/';

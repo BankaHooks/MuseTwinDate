@@ -1,0 +1,168 @@
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+body    {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    /*background-image: url("background_new.png");*/
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+
+    user-select: none;
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 70px;
+}
+
+.Header-box {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 450px;
+    padding: 0 20px;
+    border-radius: 15px;
+    flex-direction: row;
+    justify-content: space-between;
+
+    /*!*background-image: url("background_2.png");*!*/
+    /*background-repeat: no-repeat;*/
+    /*background-position: center;*/
+    /*background-size: cover;*/
+
+    box-shadow: 0 0 10px rgba(118, 31, 149, 0.671);
+}
+
+.left-part {
+    align-items: center;
+    display: flex;
+    flex:1;
+    background-color: lightblue;
+}
+.middle-part {
+    flex: 1;
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    background-color: lightpink;
+}
+.right-part {
+    align-items: center;
+    display: flex;
+    flex: 1;
+    background-color: lightblue;
+}
+
+.App-name {
+    font-family: "BBH Bartle", sans-serif;
+    font-style: normal;
+    font-weight: 400;
+    margin: 0;
+    color: rgb(191, 191, 102);
+    text-align: center;
+}
+
+
+.user-profile-grid {
+    display: grid;
+    grid-column: auto;
+    align-items: center;
+    justify-items: center;
+    gap: 50px;
+}
+
+
+.user-bio {
+    background-color: lightblue;
+    width: 45vw;
+    height: 20vw;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.user-photo {
+    background-color: white;
+    width: 22%;
+    height: 50%;
+    margin-left: 10px;
+    border-radius: 100%;
+
+    transition: all 0.3s ease-in-out;
+}
+
+.user-photo:hover {
+    transform: scale(1.35);
+}
+
+
+.user-photo-file {
+    height: 100%;
+    border-radius: 100%;
+
+    box-shadow: 0 0 25px rgba(0, 0, 0 , 0.5);
+}
+
+.bio {
+    background-color: rgb(166 216 166 / 0.66);
+    border-radius: 50px;
+    height: 90%;
+    width: 70%;
+    box-shadow: 0 0 100px rgba(112 , 171 , 95 , 0.67);
+
+    justify-content: center;
+    align-content: center;
+    max-width: 70%;
+
+    transition: all 0.3s ease-in-out;
+    user-select: text;
+}
+
+.bio:hover {
+    transform: scale(1.1);
+}
+
+.Bio-text {
+    font-family: "Bebas Neue", sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: #4a4141;
+    width: 725px;
+    margin-left: 3%;
+}
+
+.user-music-stats {
+    background-color: lightpink;
+    width: 45vw;
+    height: 50vh;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.basic-stats {
+    width: 35%;
+    height: 95%;
+    background-color: white;
+    border-radius: 25px;
+    margin-left: 15px;
+}
+
+.graphic-stats {
+    background-color: grey;
+    width: 62%;
+    height: 95%;
+    border-radius: 25px;
+    margin-right: 8px;
+}
