@@ -1,102 +1,29 @@
-html, body, #root {
-  width: 100%;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
-
-body    {
-    margin: 0;
-    padding: 0;
-    min-height: 100vh;
-    /*background-image: url("background_new.png");*/
-    background-repeat: no-repeat;
+.user-bio {
+    background-image: url("background_2.png");
     background-position: center;
+    background-repeat: no-repeat;
     background-size: cover;
 
-    user-select: none;
-}
-
-.header {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 70px;
-}
-
-.Header-box {
-    height: 70px;
-    display: flex;
-    align-items: center;
+    border-radius: 25px;
     width: 100%;
-    max-width: 450px;
-    padding: 0 20px;
-    border-radius: 15px;
-    flex-direction: row;
-    justify-content: space-between;
+    max-width: 650px;
+    height: auto;
+    padding: 20px;
+    box-sizing: border-box;
 
-    /*!*background-image: url("background_2.png");*!*/
-    /*background-repeat: no-repeat;*/
-    /*background-position: center;*/
-    /*background-size: cover;*/
-
-    box-shadow: 0 0 10px rgba(118, 31, 149, 0.671);
-}
-
-.left-part {
-    align-items: center;
-    display: flex;
-    flex:1;
-    background-color: lightblue;
-}
-.middle-part {
-    flex: 1;
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    background-color: lightpink;
-}
-.right-part {
-    align-items: center;
-    display: flex;
-    flex: 1;
-    background-color: lightblue;
-}
-
-.App-name {
-    font-family: "BBH Bartle", sans-serif;
-    font-style: normal;
-    font-weight: 400;
-    margin: 0;
-    color: rgb(191, 191, 102);
-    text-align: center;
-}
-
-
-.user-profile-grid {
-    display: grid;
-    grid-column: auto;
-    align-items: center;
-    justify-items: center;
-    gap: 50px;
-}
-
-
-.user-bio {
-    background-color: lightblue;
-    width: 45vw;
-    height: 20vw;
     display: flex;
     align-items: center;
-    gap: 15px;
+    justify-content: space-around;
+    gap: 10px;
     margin-top: 20px;
 }
 
 .user-photo {
-    background-color: white;
-    width: 22%;
-    height: 50%;
-    margin-left: 10px;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+
+    margin-left: 12px;
     border-radius: 100%;
 
     transition: all 0.3s ease-in-out;
@@ -111,14 +38,18 @@ body    {
     height: 100%;
     border-radius: 100%;
 
-    box-shadow: 0 0 25px rgba(0, 0, 0 , 0.5);
+    box-shadow: 0 2px 50px rgb(163 66 221 / 0.58);
 }
 
 .bio {
-    background-color: rgb(166 216 166 / 0.66);
+    background-image: url("background_main.jpg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+
     border-radius: 50px;
-    height: 90%;
-    width: 70%;
+    height: 85%;
+    width: 50%;
     box-shadow: 0 0 100px rgba(112 , 171 , 95 , 0.67);
 
     justify-content: center;
@@ -130,22 +61,27 @@ body    {
 }
 
 .bio:hover {
-    transform: scale(1.1);
+    transform: scale(1.1)
 }
 
 .Bio-text {
     font-family: "Bebas Neue", sans-serif;
-    font-size: 22px;
-    font-weight: bold;
-    color: #4a4141;
-    width: 725px;
+    font-size: 30px;
+    font-weight: 400;
+    color: rgba(242, 242, 18, 0.65);
+    width: 85%;
     margin-left: 3%;
 }
 
 .user-music-stats {
-    background-color: lightpink;
-    width: 45vw;
-    height: 50vh;
+    background-image: url("background_2.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+
+    border-radius: 25px;
+    width: 650px;
+    height: 44vh;
     display: flex;
     align-items: center;
     gap: 20px;

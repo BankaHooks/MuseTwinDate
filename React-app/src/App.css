@@ -140,6 +140,9 @@ body    {
 ------- > Main-part < --------
 */
 
+
+
+
 .Main-box {
     display: block;
     max-width: 1200px;
@@ -335,6 +338,13 @@ body    {
 ------- > Footer-part < --------
 */
 
+.Main-page,
+.Chats-page,
+.Profile-page,
+.Likes-page {
+    border: none !important;
+    outline: none !important;
+}
 
 .Choose-page-box {
     position: fixed;
@@ -343,14 +353,14 @@ body    {
     transform: translateX(-50%);
     width: 40vw;
     max-width: 500px;
-    height: 75px;
+    height: 100px;
 }
 
 .footer-buttons {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 75px;
+    height: 120px;
 
     background-image: url("background_2.png");
     background-repeat: no-repeat;
@@ -403,7 +413,6 @@ body    {
 }
 
 .Likes-page {
-
     height: 50px;
     width: 55px;
 
@@ -636,3 +645,9 @@ body    {
 .skip-icon {
     width: 22px;
 }
+
+.Filters-Button,
+.Report-Button {
+    border: none !important;
+    outline: none !important;
+}   

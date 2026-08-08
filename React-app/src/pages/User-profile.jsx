@@ -8,35 +8,36 @@ const User_Profile = () => {
     const base = import.meta.env.BASE_URL || '/';
 
     const user_info = {
-        age = '18',
-        gender = 'man',
-        city = 'Taganrog',
-        bio = '<150 words',
-        music_statc = {
+        age : '18',
+        gender : 'man',
+        city : 'Taganrog',
+        bio : '<150 words',
+        music_statc : {
             'favorite_genre' : 'Rock',
             'favorite_band' : 'Weezer',
             'favorite_language' : 'English',
             'second_genre' : 'Metal',
-            'Third_genre' : 'Pop' /* Just concept of user music-stats*/
+            'Third_genre' : 'Pop', 
+            'Fourh_genre' : 'Nu-Metal', /* Just concept of user music-stats*/
         },
-        user_pic = 'src_for_img',
-        topics_interestedIn = ['Coding' , 'Cooking' , 'English', 'Reading' , 'Dogs', 'Video-games'] /* No more then 10 topics per user!*/
+        user_pic : 'src_for_img', /* - source to image, or maybe just text and + '.png' */
+        topics_interestedIn : ['Coding' , 'Cooking' , 'English', 'Reading' , 'Dogs', 'Video-games'], /* No more then 10 topics per user!*/
+        type_of_searching : ['Flirt','Dating','Friendship','Just talking','Dont`t care'],
 
     }
 
     return (
-    // <div className="app" style={{
-    //     backgroundImage: `url(${base}background_new.png)`,
-    //     backgroundSize: 'cover',
-    //     backgroundPosition: 'center',
-    //     minHeight: '100vh',
-    //     backgroundRepeat: 'no-repeat'
-    //     }}>
-    //         <Header />
-        // </div>
+    <div className="User-style" style={{
+        backgroundImage: `url(${base}background_new.png)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        minHeight: '100vh',
+        backgroundRepeat: 'no-repeat'
+        }}>
+        <Header />
         <div className="user-profile-grid">
             <div className="user-bio">
-                <div class="user-photo">
+                <div className="user-photo">
                     <img src="UserPhoto.png" alt="*" className="user-photo-file" />
                 </div>
                 <div className="bio">
@@ -51,8 +52,10 @@ const User_Profile = () => {
                     <p>cool vizualization</p>
                 </div>
             </div>
+
+        <Footer />
         </div>
-        // <Footer />
+    </div>
     )
 };
 

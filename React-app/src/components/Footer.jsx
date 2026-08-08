@@ -2,26 +2,13 @@ import { useNavigate } from 'react-router-dom';
 
 function Footer () {
     const base = import.meta.env.BASE_URL || '/';
+    const navigate = useNavigate();
 
-    const Navigation = () => {
-        const navigate = useNavigate();
-    }
+    const toMainPage = () => navigate('/')
+    const toLikesPage = () => navigate('/Likes-page')
+    const toChatsPage = () => navigate('/Chats-page')
+    const toProfilePage = () => navigate('/User-profile')
 
-    const toMainPage = () => {
-        navigate('/')
-    }
-
-    const toLikesPage = () => {
-        navigate('/Likes-page')
-    }
-
-    const toChatsPage = () => {
-        navigate('/Chats-page')
-    }
-
-    const toProfilePage = () => {
-        navigate('/User-profile')
-    }
 
     return (
         <footer className="Choose-page-box">
@@ -32,35 +19,19 @@ function Footer () {
           }}>
 
             <nav>
-                <button className="Main-page" onClick={ toMainPage }>
-                    {/* <Link to="/"></Link> */}
+                <button className="Main-page" onClick={toMainPage}>
                     <img src={base + "home.svg"} alt="" />
                 </button>
-                <button className="Likes-page" onClick={ toLikesPage }>
-                    {/* <Link to="/Likes"></Link> */}
+                <button className="Likes-page" onClick={toLikesPage}>
                     <img src={base + "heart.svg"} alt="" />
                 </button>
-                <button className="Chats-page" onClick={ toChatsPage }>
-                    {/* <Link to="/Chats-page"></Link> */}
+                <button className="Chats-page" onClick={toChatsPage}>
                     <img src={base + "mail.svg"} alt="" />
                 </button>
-                <button className="Profile-page" onClick={ toProfilePage }>
-                    {/* <Link to="/User-Profile"></Link> */}
+                <button className="Profile-page" onClick={toProfilePage}>
                     <img src={base + "smile.svg"} alt="" />
                 </button>
             </nav>
-
-            {/* Idintification Routes
-            <Routes>
-                <Route path='/' element={<Home />} />
-                <Route path='/Likes' element={<Likes-page />} />
-                <Route path='/Chats-page' element={<Chats-page />} />
-                <Route path='User-Profile' element={<User-profile />} />
-
-                <Route path="*" element={<NotFound />} />
-
-            </Routes> */}
-
           </div>
         </footer>
     )
