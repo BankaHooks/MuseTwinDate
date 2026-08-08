@@ -12,19 +12,20 @@ const User_Profile = () => {
         gender : 'man',
         city : 'Taganrog',
         bio : '<150 words',
-        music_statc : {
-            'favorite_genre' : 'Rock',
-            'favorite_band' : 'Weezer',
-            'favorite_language' : 'English',
-            'second_genre' : 'Metal',
-            'Third_genre' : 'Pop', 
-            'Fourh_genre' : 'Nu-Metal', /* Just concept of user music-stats*/
+        music_stats : {
+            favorite_genre : 'Rock',
+            favorite_band : 'Weezer',
+            favorite_language : 'English',
+            second_genre : 'Metal',
+            third_genre : 'Pop', 
+            fourth_genre : 'Nu-Metal', /* Just concept of user music-stats*/
         },
         user_pic : 'src_for_img', /* - source to image, or maybe just text and + '.png' */
         topics_interestedIn : ['Coding' , 'Cooking' , 'English', 'Reading' , 'Dogs', 'Video-games'], /* No more then 10 topics per user!*/
         type_of_searching : ['Flirt','Dating','Friendship','Just talking','Dont`t care'],
+        vizualization : 'vizualization.png',
 
-    }
+    };
 
     return (
     <div className="User-style" style={{
@@ -46,10 +47,15 @@ const User_Profile = () => {
             </div>
             <div className="user-music-stats">
                 <div className="basic-stats">
-                    <p>blablabla</p>
+                    <ul>
+                        <li>{ user_info.music_stats.favorite_genre }</li>
+                        <li>{user_info.music_stats.second_genre}</li>
+                        <li>{user_info.music_stats.third_genre}</li>
+                        <li>{user_info.music_stats.fourth_genre}</li>
+                    </ul>
                 </div>
                 <div className="graphic-stats">
-                    <p>cool vizualization</p>
+                    <img src={user_info.vizualization} alt="#" className='vizualization-pic'/>
                 </div>
             </div>
 

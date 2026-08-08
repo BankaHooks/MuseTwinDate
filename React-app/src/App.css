@@ -156,7 +156,7 @@ body    {
     top: 50%;
     right: 20px;
     transform: translateY(-50%);
-    width: 80px;
+    width: 7%;
     height: auto;
 
     background-image: url("background_2.png");
@@ -348,19 +348,20 @@ body    {
 
 .Choose-page-box {
     position: fixed;
+    align-content: center;
     bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 40vw;
     max-width: 500px;
-    height: 100px;
+    height: auto;
 }
 
 .footer-buttons {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 120px;
+    height: 75px;
 
     background-image: url("background_2.png");
     background-repeat: no-repeat;

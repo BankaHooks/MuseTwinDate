@@ -5,9 +5,9 @@ function Footer () {
     const navigate = useNavigate();
 
     const toMainPage = () => navigate('/')
-    const toLikesPage = () => navigate('/Likes-page')
-    const toChatsPage = () => navigate('/Chats-page')
-    const toProfilePage = () => navigate('/User-profile')
+    const toLikesPage = () => navigate('/Likes_page')
+    const toChatsPage = () => navigate('/Chats_page')
+    const toProfilePage = () => navigate('/User_profile')
 
 
     return (

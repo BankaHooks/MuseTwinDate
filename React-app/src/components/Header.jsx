@@ -1,4 +1,4 @@
-function Header ({ onFilterClick, onReportClick }) {
+function Header ({ onFilterClick, onReportClick, showActions}) {
     const base = import.meta.env.BASE_URL || '/';
     return (
         <header className="header">
