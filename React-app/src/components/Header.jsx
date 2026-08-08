@@ -8,6 +8,7 @@ function Header ({ onFilterClick, onReportClick }) {
             backgroundPosition: 'center',
           }}>
             <div className="left-part">
+                { showActions && (
                 <button 
                 className="Filters-Button"
                 onClick={onFilterClick}
@@ -15,6 +16,7 @@ function Header ({ onFilterClick, onReportClick }) {
                     <img src={base + "list.svg"} alt="" className="filter-icon" />
                     Filters
                 </button>
+                )}
             </div>
             <div className="middle-part">
                 <h2 className="App-name">
@@ -22,10 +24,12 @@ function Header ({ onFilterClick, onReportClick }) {
                 </h2>            
             </div>
             <div className="right-part">
+                { showActions && ( 
                 <button className="Report-Button" onClick={onReportClick}>
                     <img src={base + "danger.svg"} alt="" className="report-icon" />
                     Report
                 </button>
+                )}
             </div>
           </div>
         </header>

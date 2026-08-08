@@ -18,7 +18,6 @@ function Footer () {
             backgroundPosition: 'center',
           }}>
 
-            <nav>
                 <button className="Main-page" onClick={toMainPage}>
                     <img src={base + "home.svg"} alt="" />
                 </button>
@@ -31,7 +30,6 @@ function Footer () {
                 <button className="Profile-page" onClick={toProfilePage}>
                     <img src={base + "smile.svg"} alt="" />
                 </button>
-            </nav>
           </div>
         </footer>
     )

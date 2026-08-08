@@ -34,7 +34,7 @@ const User_Profile = () => {
         minHeight: '100vh',
         backgroundRepeat: 'no-repeat'
         }}>
-        <Header />
+        <Header showActions={false} />
         <div className="user-profile-grid">
             <div className="user-bio">
                 <div className="user-photo">

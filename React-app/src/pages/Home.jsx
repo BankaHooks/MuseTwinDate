@@ -60,7 +60,7 @@ const Home = () => {
             minHeight: '100vh',
             backgroundRepeat: 'no-repeat'
         }}>
-            <Header onFilterClick={openFilter} onReportClick={openReport} />
+            <Header onFilterClick={openFilter} onReportClick={openReport} showActions={true}/>
             
 
             <div id="main-page" className="page">
