@@ -7,7 +7,8 @@ from database import crud
 from states.profile_edit import ProfileEdit
 from keyboards.inline import (
     profile_view_keyboard, genre_choose_keyboard, gender_choose_keyboard,
-    preferred_gender_keyboard, goal_keyboard, interest_keyboard
+    preferred_gender_keyboard, goal_keyboard, interest_category_keyboard,
+    interest_items_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
@@ -63,7 +64,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
     elif field == "interests":
         await state.set_state(ProfileEdit.interests)
-        await callback.message.answer("Выберите ваши интересы (можно несколько):", reply_markup=interest_keyboard())
+        await callback.message.answer("Выберите категорию интересов, затем тему. Можно выбрать до 10 тем.", reply_markup=interest_category_keyboard())
     elif field == "gender":
         await state.set_state(ProfileEdit.gender)
         await callback.message.answer("Выберите ваш пол:", reply_markup=gender_choose_keyboard())
@@ -86,7 +87,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(ProfileEdit.genres), F.data.startswith("genre_add_"))
 async def edit_add_genre(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_")[2]
+    genre = callback.data.split("_", 2)[2]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
@@ -126,28 +127,53 @@ async def edit_bands(message: Message, state: FSMContext, session: AsyncSession)
 
 @router.callback_query(StateFilter(ProfileEdit.goal), F.data.startswith("goal_"))
 async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    goal = callback.data.split("_")[1]
+    goal = callback.data.split("_", 1)[1]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, search_goal=goal)
     await state.clear()
     await callback.message.edit_text("Цель обновлена", reply_markup=main_reply_keyboard())
     await callback.answer()
 
-@router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("interest_"))
-async def edit_add_interest(callback: CallbackQuery, state: FSMContext):
-    interest = callback.data.split("_")[1]
+@router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("cat_"))
+async def edit_show_interests(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_", 1)[1]
     data = await state.get_data()
-    interests = data.get("interests", [])
-    if interest not in interests:
-        interests.append(interest)
-    await state.update_data(interests=interests)
-    await callback.answer(f"Добавлен интерес: {interest}", show_alert=False)
+    selected = data.get("interests_list", [])
+    await state.update_data(current_category=category)
+    await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
+    await callback.answer()
+
+@router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("interest_"))
+async def edit_toggle_interest(callback: CallbackQuery, state: FSMContext):
+    topic = callback.data.split("_", 1)[1]
+    data = await state.get_data()
+    selected = data.get("interests_list", [])
+    if topic in selected:
+        selected.remove(topic)
+        await callback.answer(f"Убрано: {topic}")
+    else:
+        if len(selected) >= 10:
+            await callback.answer("Можно выбрать не более 10 тем.", show_alert=True)
+            return
+        selected.append(topic)
+        await callback.answer(f"Добавлено: {topic}")
+    await state.update_data(interests_list=selected)
+    category = data.get("current_category")
+    if category:
+        await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
+    else:
+        await callback.message.edit_text("Выберите категорию:", reply_markup=interest_category_keyboard())
+
+@router.callback_query(StateFilter(ProfileEdit.interests), F.data == "interests_back")
+async def edit_interests_back(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Выберите категорию интересов:", reply_markup=interest_category_keyboard())
+    await callback.answer()
 
 @router.callback_query(StateFilter(ProfileEdit.interests), F.data == "interests_done")
 async def edit_interests_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
-    interests = data.get("interests", [])
-    interest_str = ", ".join(interests) if interests else None
+    selected = data.get("interests_list", [])
+    interest_str = ", ".join(selected) if selected else None
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, interests=interest_str)
     await state.clear()
@@ -156,7 +182,7 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
 
 @router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
 async def process_edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_")[1]
+    gender = callback.data.split("_", 1)[1]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, gender=gender)
     await state.clear()
@@ -165,7 +191,7 @@ async def process_edit_gender(callback: CallbackQuery, state: FSMContext, sessio
 
 @router.callback_query(StateFilter(ProfileEdit.preferred_gender), F.data.startswith("pref_gender_"))
 async def process_edit_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_")[2]
+    gender = callback.data.split("_", 2)[2]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, preferred_gender=gender)
     await state.clear()

@@ -1,5 +1,35 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+INTEREST_CATEGORIES = {
+    "Активный отдых и спорт": [
+        "Скалолазание", "Бег", "Плавание", "Йога", "Командные виды спорта",
+        "Зимние виды спорта", "Фитнес", "Танцы", "Велопрогулки"
+    ],
+    "Искусство и творчество": [
+        "Живопись", "Фотография", "Игра на музыкальных инструментах",
+        "Каллиграфия", "Гончарное дело", "Театр", "Литература", "Граффити"
+    ],
+    "Интеллектуальные увлечения и наука": [
+        "Книги", "Настольные игры", "Астрономия", "История",
+        "Научные подкасты", "Шахматы", "Психология", "Языки"
+    ],
+    "Еда и гастрономия": [
+        "Кофе-культура", "Виноделие", "Кулинария",
+        "Гастрономический туризм", "Веганство", "Завтраки", "Фермерские продукты"
+    ],
+    "Путешествия и природа": [
+        "Трекинг", "Автостоп", "Экотуризм", "Кемпинг",
+        "Изучение городов", "Фестивальная культура"
+    ],
+    "Технологии и поп-культура": [
+        "Видеоигры", "Кино", "Аниме", "Подкасты", "Киберспорт", "Комиксы"
+    ],
+    "Разное": [
+        "DIY", "Комнатные растения", "Осознанность",
+        "Медитация", "Ретро-техника", "Карты и география"
+    ]
+}
+
 def main_menu_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Поиск", callback_data="browse")],
@@ -14,9 +44,8 @@ def profile_view_keyboard(user):
     city_toggle_text = "Искать в моём городе" if user.search_city_only else "Искать везде"
     buttons = [
         [InlineKeyboardButton(text="Имя", callback_data="edit_name"),
-         InlineKeyboardButton(text="Свой пол", callback_data="edit_gender")],
-        [InlineKeyboardButton(text="Возраст", callback_data="edit_age"),
-         InlineKeyboardButton(text="Город", callback_data="edit_city")],
+         InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
+        [InlineKeyboardButton(text="Город", callback_data="edit_city")],
         [InlineKeyboardButton(text="Жанры", callback_data="edit_genres"),
          InlineKeyboardButton(text="Группы", callback_data="edit_bands")],
         [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
@@ -32,13 +61,13 @@ def profile_view_keyboard(user):
 
 def gender_choose_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="Мужской", callback_data="gender_male")],
-        [InlineKeyboardButton(text="Женский", callback_data="gender_female")],
+        [InlineKeyboardButton(text="Мужской", callback_data="gender_Мужской")],
+        [InlineKeyboardButton(text="Женский", callback_data="gender_Женский")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def preferred_gender_keyboard():
-    genders = [("Мужской", "male"), ("Женский", "female"), ("Любой", "any")]
+    genders = [("Мужской", "Мужской"), ("Женский", "Женский"), ("Любой", "Любой")]
     buttons = [[InlineKeyboardButton(text=label, callback_data=f"pref_gender_{value}")] for label, value in genders]
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -55,10 +84,20 @@ def goal_keyboard():
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def interest_keyboard():
-    interests = ["Программирование", "Компьютерные игры", "История", "K-pop", "Кино", "Книги", "Спорт", "Танцы", "Путешествия", "Музыка"]
-    buttons = [[InlineKeyboardButton(text=i, callback_data=f"interest_{i}")] for i in interests]
+def interest_category_keyboard():
+    buttons = []
+    for category in INTEREST_CATEGORIES.keys():
+        buttons.append([InlineKeyboardButton(text=category, callback_data=f"cat_{category}")])
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="interests_done")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def interest_items_keyboard(category, selected):
+    topics = INTEREST_CATEGORIES.get(category, [])
+    buttons = []
+    for topic in topics:
+        check = "✅ " if topic in selected else ""
+        buttons.append([InlineKeyboardButton(text=f"{check}{topic}", callback_data=f"interest_{topic}")])
+    buttons.append([InlineKeyboardButton(text="Назад к категориям", callback_data="interests_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def browse_actions_keyboard():
@@ -76,7 +115,7 @@ def profile_actions_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def likes_action_keyboard(user_id: int):
+def likes_action_keyboard(user_id):
     buttons = [
         [InlineKeyboardButton(text="Взаимно", callback_data=f"likeback_{user_id}")],
         [InlineKeyboardButton(text="Пропустить", callback_data=f"skip_like_{user_id}")],

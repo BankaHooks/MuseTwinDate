@@ -7,7 +7,7 @@ from database import crud
 from states.registration import Registration
 from keyboards.inline import (
     genre_choose_keyboard, gender_choose_keyboard, preferred_gender_keyboard,
-    goal_keyboard, interest_keyboard
+    goal_keyboard, interest_category_keyboard, interest_items_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, normalize_city
@@ -34,7 +34,7 @@ async def reg_name(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.gender), F.data.startswith("gender_"))
 async def reg_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_")[1]
+    gender = callback.data.split("_", 1)[1]
     await state.update_data(gender=gender)
     await state.set_state(Registration.age)
     await callback.message.edit_text("Сколько вам лет? (18-99)")
@@ -58,7 +58,7 @@ async def reg_city(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.genres), F.data.startswith("genre_add_"))
 async def reg_add_genre(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_")[2]
+    genre = callback.data.split("_", 2)[2]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
@@ -101,28 +101,53 @@ async def reg_songs(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.goal), F.data.startswith("goal_"))
 async def reg_goal(callback: CallbackQuery, state: FSMContext):
-    goal = callback.data.split("_")[1]
+    goal = callback.data.split("_", 1)[1]
     await state.update_data(goal=goal)
     await state.set_state(Registration.interests)
-    await callback.message.edit_text("Выберите ваши интересы (можно несколько):", reply_markup=interest_keyboard())
+    await callback.message.edit_text("Выберите категорию интересов, затем тему. Можно выбрать до 10 тем.", reply_markup=interest_category_keyboard())
+    await callback.answer()
+
+@router.callback_query(StateFilter(Registration.interests), F.data.startswith("cat_"))
+async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_", 1)[1]
+    data = await state.get_data()
+    selected = data.get("interests_list", [])
+    await state.update_data(current_category=category)
+    await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
     await callback.answer()
 
 @router.callback_query(StateFilter(Registration.interests), F.data.startswith("interest_"))
-async def reg_add_interest(callback: CallbackQuery, state: FSMContext):
-    interest = callback.data.split("_")[1]
+async def reg_toggle_interest(callback: CallbackQuery, state: FSMContext):
+    topic = callback.data.split("_", 1)[1]
     data = await state.get_data()
-    interests = data.get("interests", [])
-    if interest not in interests:
-        interests.append(interest)
-    await state.update_data(interests=interests)
-    await callback.answer(f"Добавлен интерес: {interest}", show_alert=False)
+    selected = data.get("interests_list", [])
+    if topic in selected:
+        selected.remove(topic)
+        await callback.answer(f"Убрано: {topic}")
+    else:
+        if len(selected) >= 10:
+            await callback.answer("Можно выбрать не более 10 тем.", show_alert=True)
+            return
+        selected.append(topic)
+        await callback.answer(f"Добавлено: {topic}")
+    await state.update_data(interests_list=selected)
+    category = data.get("current_category")
+    if category:
+        await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
+    else:
+        await callback.message.edit_text("Выберите категорию:", reply_markup=interest_category_keyboard())
+
+@router.callback_query(StateFilter(Registration.interests), F.data == "interests_back")
+async def reg_interests_back(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Выберите категорию интересов:", reply_markup=interest_category_keyboard())
+    await callback.answer()
 
 @router.callback_query(StateFilter(Registration.interests), F.data == "interests_done")
 async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    interests = data.get("interests", [])
-    if interests:
-        await state.update_data(interests=", ".join(interests))
+    selected = data.get("interests_list", [])
+    if selected:
+        await state.update_data(interests=", ".join(selected))
     else:
         await state.update_data(interests=None)
     await state.set_state(Registration.preferred_gender)
@@ -131,7 +156,7 @@ async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("pref_gender_"))
 async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_")[2]
+    gender = callback.data.split("_", 2)[2]
     await state.update_data(preferred_gender=gender)
     await state.set_state(Registration.bio)
     await callback.message.edit_text("Расскажите немного о себе (био):")
