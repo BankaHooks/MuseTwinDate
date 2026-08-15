@@ -67,3 +67,16 @@ async def successful_payment(message: Message, session: AsyncSession):
             await message.answer("✅ Premium activated! Thank you.", reply_markup=main_menu_keyboard())
             return
     await message.answer("Payment recorded, but something went wrong. Contact support.")
+
+from aiogram.types import CallbackQuery
+
+@router.message(F.text == "⭐ Купить премиум")
+async def premium_button_handler(message: Message, session: AsyncSession):
+    fake_callback = CallbackQuery(
+        id="fake",
+        from_user=message.from_user,
+        message=message,
+        chat_instance="fake",
+        data="premium",
+    )
+    await premium_show(fake_callback, session)

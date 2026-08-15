@@ -8,7 +8,7 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import config
 from database.db import engine, Base, AsyncSessionLocal
-from handlers import start, menu, browse, likes, chats, profile, premium, report, admin
+from handlers import start, menu, browse, likes, profile, premium, report, admin
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -48,7 +48,6 @@ async def main():
         menu.router,
         browse.router,
         likes.router,
-        chats.router,
         profile.router,
         premium.router,
         report.router,

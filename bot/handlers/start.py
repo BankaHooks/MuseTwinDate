@@ -5,9 +5,11 @@ from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from states.registration import Registration
-from keyboards.inline import main_menu_keyboard, genre_keyboard, gender_keyboard
+from keyboards.inline import genre_keyboard, gender_keyboard
+from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age
 from utils.media import save_photo
+from utils.helpers import send_security_notice_if_needed
 
 router = Router()
 
@@ -16,7 +18,8 @@ async def start_command(message: Message, state: FSMContext, session: AsyncSessi
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     if user:
         await state.clear()
-        await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_menu_keyboard())
+        await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_reply_keyboard())
+        await send_security_notice_if_needed(message, user, session)
         return
     await state.set_state(Registration.name)
     await message.answer("Давайте зарегистрируемся!\nКак вас зовут? (можно пропустить, отправив 'Пропустить')")
@@ -109,11 +112,11 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         photo_file_id=photo_file_id,
     )
     await state.clear()
-    await message.answer("Регистрация завершена!", reply_markup=main_menu_keyboard())
+    await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
 
 @router.callback_query(F.data == "cancel")
 async def cancel_callback(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text("Отменено.")
-    await callback.message.answer("Главное меню:", reply_markup=main_menu_keyboard())
+    await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
     await callback.answer()

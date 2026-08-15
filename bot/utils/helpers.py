@@ -1,3 +1,17 @@
+import random
+from datetime import datetime, timedelta
+
+SECURITY_TIPS = [
+    "⚠️ Никогда не переводите деньги незнакомым людям.",
+    "🔒 Не делитесь личными данными (адрес, паспорт, телефон).",
+    "📸 Если просят фото с паспортом — мошенники.",
+    "💬 Не переходите по подозрительным ссылкам.",
+    "🚫 Если собеседник просит деньги — заблокируйте.",
+    "🔐 Не передавайте доступ к вашему Telegram.",
+    "📞 Не подтверждайте номера по SMS от незнакомцев.",
+    "🛡️ Включите двухфакторную аутентификацию в Telegram.",
+]
+
 def validate_age(age_str: str) -> bool:
     try:
         age = int(age_str)
@@ -35,3 +49,10 @@ def format_profile(user) -> str:
     text += f"Био: {user.bio or 'Не указано'}\n"
     text += f"Премиум: {'✅' if user.is_premium else '❌'}"
     return text
+
+async def send_security_notice_if_needed(message, user, session):
+    if not user.last_security_notice or (datetime.utcnow() - user.last_security_notice) > timedelta(days=1):
+        tip = random.choice(SECURITY_TIPS)
+        await message.answer(tip)
+        user.last_security_notice = datetime.utcnow()
+        await session.commit()

@@ -8,7 +8,6 @@ from states.profile_edit import ProfileEdit
 from keyboards.inline import profile_view_keyboard, genre_keyboard, gender_keyboard, main_menu_keyboard
 from utils.helpers import validate_age, format_profile
 from utils.media import save_photo
-from utils.music_engine import resolve_tracks, engine, vector_to_json
 
 router = Router()
 
@@ -19,9 +18,8 @@ EDIT_PROMPTS = {
     "band": "Введите любимую группу (или 'Пропустить'):",
     "bio": "Введите новое био:",
     "photo": "Отправьте новое фото (или 'Пропустить'):",
-    "tracks": "Назовите 2-3 любимые песни через запятую (или 'Пропустить', чтобы оставить как есть):",
+    "songs": "Введите ваши любимые песни (можно несколько, через запятую):",
 }
-
 
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
@@ -36,7 +34,6 @@ async def profile_view(callback: CallbackQuery, session: AsyncSession):
     else:
         await callback.message.answer(text, reply_markup=profile_view_keyboard())
     await callback.answer()
-
 
 @router.callback_query(F.data.startswith("edit_"))
 async def edit_field(callback: CallbackQuery, state: FSMContext):
@@ -53,7 +50,6 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(EDIT_PROMPTS[field])
     await callback.answer()
 
-
 @router.message(ProfileEdit.name)
 async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
     name = None if message.text.lower() == "пропустить" else message.text
@@ -61,7 +57,6 @@ async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
     await crud.update_user(session, user, name=name)
     await state.clear()
     await message.answer("Имя обновлено!", reply_markup=main_menu_keyboard())
-
 
 @router.message(ProfileEdit.age)
 async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
@@ -73,14 +68,12 @@ async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
     await state.clear()
     await message.answer("Возраст обновлён!", reply_markup=main_menu_keyboard())
 
-
 @router.message(ProfileEdit.city)
 async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, city=message.text)
     await state.clear()
     await message.answer("Город обновлён!", reply_markup=main_menu_keyboard())
-
 
 @router.callback_query(StateFilter(ProfileEdit.genre), F.data.startswith("genre_"))
 async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -91,28 +84,13 @@ async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncS
     await callback.message.edit_text("Жанр обновлён!", reply_markup=main_menu_keyboard())
     await callback.answer()
 
-
-@router.message(ProfileEdit.tracks)
-async def edit_tracks(message: Message, state: FSMContext, session: AsyncSession):
+@router.message(ProfileEdit.songs)
+async def edit_songs(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    if message.text.lower() == "пропустить":
-        await state.clear()
-        await message.answer("Оставили как было.", reply_markup=main_menu_keyboard())
-        return
-    names = message.text.split(",")
-    matched, unmatched = resolve_tracks(names)
-    if not matched:
-        await message.answer("Ни одна песня не найдена. Попробуйте ещё раз или отправьте 'Пропустить'.")
-        return
-    indices = [m["index"] for m in matched]
-    vector = engine.build_taste_vector(indices)
-    tracks_display = "; ".join(f"{m['track_name']} — {m['artist']}" for m in matched)
-    await crud.update_user(session, user, favorite_tracks=tracks_display, taste_vector=vector_to_json(vector))
-    reply = "Любимые песни обновлены: " + tracks_display
-    if unmatched:
-        reply += "\nНе нашли: " + ", ".join(unmatched)
+    songs = None if message.text.lower() == "пропустить" else message.text
+    await crud.update_user(session, user, favorite_songs=songs)
     await state.clear()
-    await message.answer(reply, reply_markup=main_menu_keyboard())
+    await message.answer("Любимые песни обновлены!", reply_markup=main_menu_keyboard())
 
 @router.message(ProfileEdit.band)
 async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
@@ -121,7 +99,6 @@ async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
     await crud.update_user(session, user, favorite_band=band)
     await state.clear()
     await message.answer("Группа обновлена!", reply_markup=main_menu_keyboard())
-
 
 @router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
 async def edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -132,14 +109,12 @@ async def edit_gender(callback: CallbackQuery, state: FSMContext, session: Async
     await callback.message.edit_text("Пол партнера обновлён!", reply_markup=main_menu_keyboard())
     await callback.answer()
 
-
 @router.message(ProfileEdit.bio)
 async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, bio=message.text)
     await state.clear()
     await message.answer("Био обновлено!", reply_markup=main_menu_keyboard())
-
 
 @router.message(ProfileEdit.photo, F.content_type.in_({ContentType.PHOTO, ContentType.TEXT}))
 async def edit_photo(message: Message, state: FSMContext, session: AsyncSession):
@@ -154,3 +129,18 @@ async def edit_photo(message: Message, state: FSMContext, session: AsyncSession)
             return
     await state.clear()
     await message.answer("Фото обновлено!", reply_markup=main_menu_keyboard())
+
+
+from aiogram.types import CallbackQuery
+import json
+
+@router.message(F.text == "👤 Профиль")
+async def profile_button_handler(message: Message, session: AsyncSession):
+    fake_callback = CallbackQuery(
+        id="fake",
+        from_user=message.from_user,
+        message=message,
+        chat_instance="fake",
+        data="profile",
+    )
+    await profile_view(fake_callback, session)

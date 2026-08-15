@@ -3,9 +3,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 def main_menu_keyboard():
     buttons = [
         [InlineKeyboardButton(text="🔍 Поиск", callback_data="browse")],
-        [InlineKeyboardButton(text="👤 Профиль", callback_data="profile")],
+        [InlineKeyboardButton(text="Профиль", callback_data="profile")],
         [InlineKeyboardButton(text="❤️ Лайки", callback_data="likes")],
-        [InlineKeyboardButton(text="💬 Чаты", callback_data="chats")],
         [InlineKeyboardButton(text="⭐ Купить премиум", callback_data="premium")],
         [InlineKeyboardButton(text="🎵 Запустить Mini-App", web_app={"url": "https://your-domain.com/MuseTwinDate/"})],
     ]
@@ -13,16 +12,16 @@ def main_menu_keyboard():
 
 def profile_view_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="✏️ Имя", callback_data="edit_name"),
-         InlineKeyboardButton(text="✏️ Возраст", callback_data="edit_age")],
-        [InlineKeyboardButton(text="✏️ Город", callback_data="edit_city"),
-         InlineKeyboardButton(text="✏️ Жанр", callback_data="edit_genre")],
-        [InlineKeyboardButton(text="✏️ Группа", callback_data="edit_band"),
-         InlineKeyboardButton(text="✏️ Пол партнера", callback_data="edit_gender")],
-        [InlineKeyboardButton(text="✏️ Песни", callback_data="edit_songs"),
-         InlineKeyboardButton(text="✏️ Био", callback_data="edit_bio")],
-        [InlineKeyboardButton(text="🖼️ Фото", callback_data="edit_photo")],
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+        [InlineKeyboardButton(text="Имя", callback_data="edit_name"),
+         InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
+        [InlineKeyboardButton(text="Город", callback_data="edit_city"),
+         InlineKeyboardButton(text="Жанр", callback_data="edit_genre")],
+        [InlineKeyboardButton(text="Группа", callback_data="edit_band"),
+         InlineKeyboardButton(text="Пол партнера", callback_data="edit_gender")],
+        [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
+         InlineKeyboardButton(text="О себе", callback_data="edit_bio")],
+        [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -43,10 +42,6 @@ def browse_actions_keyboard(is_premium: bool = False):
         [InlineKeyboardButton(text="⏩ Скип", callback_data="skip"),
          InlineKeyboardButton(text="❤️ Лайк", callback_data="like")],
     ]
-    if is_premium:
-        buttons.append([InlineKeyboardButton(text="💬 Написать в ЛС", callback_data="write_message")])
-    buttons.append([InlineKeyboardButton(text="👤 Профиль", callback_data="view_profile"),
-                     InlineKeyboardButton(text="🚫 Пожаловаться", callback_data="report_user")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def profile_actions_keyboard():
@@ -76,3 +71,4 @@ def premium_plans_keyboard():
         [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+

@@ -128,3 +128,20 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     ).limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()
+
+async def can_like(session: AsyncSession, user: User) -> bool:
+    if user.is_premium:
+        return True
+    today = datetime.utcnow().date()
+    if user.last_like_date is None or user.last_like_date.date() < today:
+        user.likes_today = 0
+        user.last_like_date = datetime.utcnow()
+        await session.commit()
+    return user.likes_today < 30
+
+async def increment_likes(session: AsyncSession, user: User):
+    user.likes_today += 1
+    if user.last_like_date is None or user.last_like_date.date() < datetime.utcnow().date():
+        user.likes_today = 1
+        user.last_like_date = datetime.utcnow()
+    await session.commit()
