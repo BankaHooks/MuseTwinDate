@@ -69,17 +69,17 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
         await callback.bot.send_message(
             candidate.telegram_id,
-            f"🎉 Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
+            f"Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
             f"Напишите ему: {user_link}",
             parse_mode="Markdown"
         )
         await callback.bot.send_message(
             user.telegram_id,
-            f"🎉 Взаимный лайк! Вы и {candidate.name or candidate.username} понравились друг другу.\n"
+            f"Взаимный лайк! Вы и {candidate.name or candidate.username} понравились друг другу.\n"
             f"Напишите ему: {candidate_link}",
             parse_mode="Markdown"
         )
-        await callback.answer("Это взаимно! 🎉")
+        await callback.answer("Это взаимно!")
     else:
         await callback.answer("Лайк поставлен!")
     await show_next(callback, state, session)
@@ -152,7 +152,7 @@ async def view_profile_callback(callback: CallbackQuery, state: FSMContext, sess
     if not candidate:
         await callback.answer("Не найден.")
         return
-    text = format_user_card(candidate) + "\n\n🛡️ Дополнительно:"
+    text = format_user_card(candidate) + "\n\nДополнительно:"
     markup = profile_actions_keyboard()
     if candidate.photo_file_id:
         await callback.message.edit_media(

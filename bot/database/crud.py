@@ -115,6 +115,7 @@ async def record_payment(session: AsyncSession, user_id: int, charge_id: str, am
     return payment
 
 async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit: int = 300) -> List[User]:
+    current_user = await get_user_by_id(session, current_user_id)
     skipped = await get_skipped_user_ids(session, current_user_id)
     blocked_by_me = await get_blocked_user_ids(session, current_user_id)
     blocked_me = await get_blockers_for_user(session, current_user_id)
@@ -123,9 +124,13 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     )
     liked_ids = likes_from_me.scalars().all()
     exclude = set([current_user_id] + skipped + blocked_by_me + blocked_me + liked_ids)
+
     stmt = select(User).where(
         and_(User.id.notin_(exclude), User.is_banned == False)
-    ).limit(limit)
+    )
+    if current_user.search_city_only and current_user.city:
+        stmt = stmt.where(User.city == current_user.city)
+    stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()
 

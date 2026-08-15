@@ -9,7 +9,6 @@ from keyboards.inline import genre_keyboard, gender_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age
 from utils.media import save_photo
-from utils.helpers import send_security_notice_if_needed
 
 router = Router()
 
@@ -19,7 +18,6 @@ async def start_command(message: Message, state: FSMContext, session: AsyncSessi
     if user:
         await state.clear()
         await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_reply_keyboard())
-        await send_security_notice_if_needed(message, user, session)
         return
     await state.set_state(Registration.name)
     await message.answer("Давайте зарегистрируемся!\nКак вас зовут? (можно пропустить, отправив 'Пропустить')")

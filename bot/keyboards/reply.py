@@ -3,12 +3,12 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 def main_reply_keyboard():
     buttons = [
         [
-            KeyboardButton(text="🔍 Поиск"),
-            KeyboardButton(text="👤 Профиль"),
+            KeyboardButton(text="Поиск"),
+            KeyboardButton(text="Профиль"),
         ],
         [
-            KeyboardButton(text="❤️ Лайки"),
-            KeyboardButton(text="⭐ Купить премиум"),
+            KeyboardButton(text="Лайки"),
+            KeyboardButton(text="Купить премиум"),
         ],
     ]
     return ReplyKeyboardMarkup(

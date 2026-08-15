@@ -23,17 +23,36 @@ EDIT_PROMPTS = {
 
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
+    await show_profile(callback.message, callback.from_user.id, session, delete_old=True)
+    await callback.answer()
+
+async def show_profile(target: Message, user_id: int, session: AsyncSession, delete_old: bool = False):
+    user = await crud.get_user_by_telegram_id(session, user_id)
+    if not user:
+        await target.answer("Зарегистрируйтесь через /start")
+        return
+    text = format_profile(user)
+    if delete_old:
+        await target.delete()
+    if user.photo_file_id:
+        await target.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_view_keyboard(user))
+    else:
+        await target.answer(text, reply_markup=profile_view_keyboard(user))
+
+async def show_profile_for_message(message: Message, session: AsyncSession):
+    await show_profile(message, message.from_user.id, session, delete_old=False)
+
+@router.callback_query(F.data == "toggle_city")
+async def toggle_city(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
         await callback.answer("Зарегистрируйтесь через /start")
         return
-    text = format_profile(user)
+    user.search_city_only = not user.search_city_only
+    await session.commit()
     await callback.message.delete()
-    if user.photo_file_id:
-        await callback.message.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_view_keyboard())
-    else:
-        await callback.message.answer(text, reply_markup=profile_view_keyboard())
-    await callback.answer()
+    await show_profile(callback.message, callback.from_user.id, session, delete_old=False)
+    await callback.answer("Настройка обновлена")
 
 @router.callback_query(F.data.startswith("edit_"))
 async def edit_field(callback: CallbackQuery, state: FSMContext):
@@ -56,7 +75,7 @@ async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, name=name)
     await state.clear()
-    await message.answer("Имя обновлено!", reply_markup=main_menu_keyboard())
+    await message.answer("Имя обновлено", reply_markup=main_menu_keyboard())
 
 @router.message(ProfileEdit.age)
 async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
@@ -66,14 +85,14 @@ async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, age=int(message.text))
     await state.clear()
-    await message.answer("Возраст обновлён!", reply_markup=main_menu_keyboard())
+    await message.answer("Возраст обновлён", reply_markup=main_menu_keyboard())
 
 @router.message(ProfileEdit.city)
 async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, city=message.text)
     await state.clear()
-    await message.answer("Город обновлён!", reply_markup=main_menu_keyboard())
+    await message.answer("Город обновлён", reply_markup=main_menu_keyboard())
 
 @router.callback_query(StateFilter(ProfileEdit.genre), F.data.startswith("genre_"))
 async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -81,7 +100,7 @@ async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncS
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, genre=genre)
     await state.clear()
-    await callback.message.edit_text("Жанр обновлён!", reply_markup=main_menu_keyboard())
+    await callback.message.edit_text("Жанр обновлён", reply_markup=main_menu_keyboard())
     await callback.answer()
 
 @router.message(ProfileEdit.songs)
@@ -90,7 +109,7 @@ async def edit_songs(message: Message, state: FSMContext, session: AsyncSession)
     songs = None if message.text.lower() == "пропустить" else message.text
     await crud.update_user(session, user, favorite_songs=songs)
     await state.clear()
-    await message.answer("Любимые песни обновлены!", reply_markup=main_menu_keyboard())
+    await message.answer("Любимые песни обновлены", reply_markup=main_menu_keyboard())
 
 @router.message(ProfileEdit.band)
 async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
@@ -98,7 +117,7 @@ async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, favorite_band=band)
     await state.clear()
-    await message.answer("Группа обновлена!", reply_markup=main_menu_keyboard())
+    await message.answer("Группа обновлена", reply_markup=main_menu_keyboard())
 
 @router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
 async def edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -106,7 +125,7 @@ async def edit_gender(callback: CallbackQuery, state: FSMContext, session: Async
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, preferred_gender=gender)
     await state.clear()
-    await callback.message.edit_text("Пол партнера обновлён!", reply_markup=main_menu_keyboard())
+    await callback.message.edit_text("Пол партнера обновлён", reply_markup=main_menu_keyboard())
     await callback.answer()
 
 @router.message(ProfileEdit.bio)
@@ -114,7 +133,7 @@ async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, bio=message.text)
     await state.clear()
-    await message.answer("Био обновлено!", reply_markup=main_menu_keyboard())
+    await message.answer("Био обновлено", reply_markup=main_menu_keyboard())
 
 @router.message(ProfileEdit.photo, F.content_type.in_({ContentType.PHOTO, ContentType.TEXT}))
 async def edit_photo(message: Message, state: FSMContext, session: AsyncSession):
@@ -128,19 +147,4 @@ async def edit_photo(message: Message, state: FSMContext, session: AsyncSession)
             await message.answer("Отправьте фото или 'Пропустить'")
             return
     await state.clear()
-    await message.answer("Фото обновлено!", reply_markup=main_menu_keyboard())
-
-
-from aiogram.types import CallbackQuery
-import json
-
-@router.message(F.text == "👤 Профиль")
-async def profile_button_handler(message: Message, session: AsyncSession):
-    fake_callback = CallbackQuery(
-        id="fake",
-        from_user=message.from_user,
-        message=message,
-        chat_instance="fake",
-        data="profile",
-    )
-    await profile_view(fake_callback, session)
+    await message.answer("Фото обновлено", reply_markup=main_menu_keyboard())

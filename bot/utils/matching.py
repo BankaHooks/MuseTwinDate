@@ -32,10 +32,13 @@ async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Opti
         common = user_keywords & cand_keywords
         if common:
             score = len(common) / max(len(user_keywords), 1)
+        # жанр – важный фактор
         if user.genre and candidate.genre and user.genre.lower() == candidate.genre.lower():
             score += 0.3
+        # полное совпадение группы – сильный бонус
         if user.favorite_band and candidate.favorite_band and user.favorite_band.lower() == candidate.favorite_band.lower():
             score += 0.5
+        # если у пользователя нет ключевых слов, то берём случайного с низким скором
         scored.append((candidate, min(score, 1.0)))
 
     if not scored:
