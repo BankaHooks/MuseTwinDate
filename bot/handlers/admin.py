@@ -89,7 +89,7 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
     ])
     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
-    await state.clear()  # чистим, но мы используем колбэки
+    await state.clear()
 
 @router.callback_query(F.data.startswith("admin_send_"))
 async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -145,11 +145,15 @@ async def admin_premium_set(message: Message, state: FSMContext, session: AsyncS
     if months not in [1,3,6]:
         await message.answer("Допустимые сроки: 1, 3, 6 месяцев.")
         return
-    if identifier.isdigit():
-        user = await crud.get_user_by_telegram_id(session, int(identifier))
-    else:
-        user = await session.execute(select(User).where(User.username == identifier))
-        user = user.scalar_one_or_none()
+    try:
+        if identifier.isdigit():
+            user = await crud.get_user_by_telegram_id(session, int(identifier))
+        else:
+            user = await session.execute(select(User).where(User.username == identifier))
+            user = user.scalar_one_or_none()
+    except Exception as e:
+        await message.answer(f"Ошибка: {e}")
+        return
     if not user:
         await message.answer("Пользователь не найден.")
         return
