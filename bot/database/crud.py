@@ -114,7 +114,7 @@ async def record_payment(session: AsyncSession, user_id: int, charge_id: str, am
     await session.commit()
     return payment
 
-async def get_random_candidate(session: AsyncSession, current_user_id: int) -> Optional[User]:
+async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit: int = 300) -> List[User]:
     skipped = await get_skipped_user_ids(session, current_user_id)
     blocked_by_me = await get_blocked_user_ids(session, current_user_id)
     blocked_me = await get_blockers_for_user(session, current_user_id)
@@ -125,6 +125,6 @@ async def get_random_candidate(session: AsyncSession, current_user_id: int) -> O
     exclude = set([current_user_id] + skipped + blocked_by_me + blocked_me + liked_ids)
     stmt = select(User).where(
         and_(User.id.notin_(exclude), User.is_banned == False)
-    ).order_by(func.random()).limit(1)
+    ).limit(limit)
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    return result.scalars().all()

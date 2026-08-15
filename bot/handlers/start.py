@@ -4,11 +4,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from database.db import get_db
 from states.registration import Registration
 from keyboards.inline import main_menu_keyboard, genre_keyboard, gender_keyboard
 from utils.helpers import validate_age
 from utils.media import save_photo
+from utils.music_engine import resolve_tracks, engine, vector_to_json
 
 router = Router()
 
@@ -48,9 +48,35 @@ async def reg_city(message: Message, state: FSMContext):
 async def reg_genre(callback: CallbackQuery, state: FSMContext):
     genre = callback.data.split("_", 1)[1]
     await state.update_data(genre=genre)
-    await state.set_state(Registration.band)
-    await callback.message.edit_text("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
+    await state.set_state(Registration.tracks)
+    await callback.message.edit_text(
+        "Назовите 2-3 любимые песни через запятую — так мы подберём вам пару со схожим вкусом.\n"
+        "Например: Bohemian Rhapsody, Yesterday\n(или отправьте 'Пропустить')"
+    )
     await callback.answer()
+
+@router.message(Registration.tracks)
+async def reg_tracks(message: Message, state: FSMContext):
+    if message.text.lower() == "пропустить":
+        await state.update_data(taste_vector=None, favorite_tracks=None)
+        await state.set_state(Registration.band)
+        await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
+        return
+    names = message.text.split(",")
+    matched, unmatched = resolve_tracks(names)
+    if not matched:
+        await message.answer("Ни одна песня не найдена в базе. Попробуйте ещё раз или отправьте 'Пропустить'.")
+        return
+    indices = [m["index"] for m in matched]
+    vector = engine.build_taste_vector(indices)
+    tracks_display = [f"{m['track_name']} — {m['artist']}" for m in matched]
+    await state.update_data(taste_vector=vector_to_json(vector), favorite_tracks="; ".join(tracks_display))
+    reply = "Нашли: " + ", ".join(tracks_display)
+    if unmatched:
+        reply += "\nНе нашли: " + ", ".join(unmatched)
+    await message.answer(reply)
+    await state.set_state(Registration.band)
+    await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
 
 @router.message(Registration.band)
 async def reg_band(message: Message, state: FSMContext):
@@ -61,7 +87,7 @@ async def reg_band(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("gender_"))
 async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_", 1)[1]  # male, female, any
+    gender = callback.data.split("_", 1)[1]
     await state.update_data(preferred_gender=gender)
     await state.set_state(Registration.bio)
     await callback.message.edit_text("Расскажите немного о себе (био):")
@@ -85,7 +111,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
             await message.answer("Отправьте фото или 'Пропустить'")
             return
     data = await state.get_data()
-    user = await crud.create_user(
+    await crud.create_user(
         session,
         telegram_id=message.from_user.id,
         username=message.from_user.username,
@@ -94,6 +120,8 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         city=data.get("city"),
         genre=data.get("genre"),
         favorite_band=data.get("favorite_band"),
+        favorite_tracks=data.get("favorite_tracks"),
+        taste_vector=data.get("taste_vector"),
         preferred_gender=data.get("preferred_gender"),
         bio=data.get("bio"),
         photo_file_id=photo_file_id,

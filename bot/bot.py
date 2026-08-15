@@ -40,7 +40,7 @@ async def main():
             logger.info("Using Redis storage")
         except Exception as e:
             logger.warning(f"Redis init failed: {e}, using MemoryStorage")
-    bot = Bot(token=config.BOT_TOKEN, request_timeout=60)
+    bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     dp = Dispatcher(storage=storage)
     dp.update.middleware(DBSessionMiddleware())
     dp.include_routers(
