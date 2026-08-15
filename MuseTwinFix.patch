@@ -1,991 +1,415 @@
-diff --git a/bot/bot.py b/bot/bot.py
-index 936ebb9..a1ac0a1 100644
---- a/bot/bot.py
-+++ b/bot/bot.py
-@@ -40,7 +40,7 @@ async def main():
-             logger.info("Using Redis storage")
-         except Exception as e:
-             logger.warning(f"Redis init failed: {e}, using MemoryStorage")
--    bot = Bot(token=config.BOT_TOKEN, request_timeout=60)
-+    bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
-     dp = Dispatcher(storage=storage)
-     dp.update.middleware(DBSessionMiddleware())
-     dp.include_routers(
-diff --git a/bot/config.py b/bot/config.py
-index 4dff0d8..f8055a3 100644
---- a/bot/config.py
-+++ b/bot/config.py
-@@ -13,4 +13,8 @@ class Config:
-     WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-     MEDIA_DIR = "media"
-     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-+    MUSIC_DATASET_PATH = os.getenv(
-+        "MUSIC_DATASET_PATH",
-+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "spotify_dataset.csv")
-+    )
- config = Config()
-\ No newline at end of file
-diff --git a/bot/database/crud.py b/bot/database/crud.py
-index ed7a4e8..8a69452 100644
---- a/bot/database/crud.py
-+++ b/bot/database/crud.py
-@@ -114,7 +114,7 @@ async def record_payment(session: AsyncSession, user_id: int, charge_id: str, am
-     await session.commit()
-     return payment
- 
--async def get_random_candidate(session: AsyncSession, current_user_id: int) -> Optional[User]:
-+async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit: int = 300) -> List[User]:
-     skipped = await get_skipped_user_ids(session, current_user_id)
-     blocked_by_me = await get_blocked_user_ids(session, current_user_id)
-     blocked_me = await get_blockers_for_user(session, current_user_id)
-@@ -125,6 +125,6 @@ async def get_random_candidate(session: AsyncSession, current_user_id: int) -> O
-     exclude = set([current_user_id] + skipped + blocked_by_me + blocked_me + liked_ids)
-     stmt = select(User).where(
-         and_(User.id.notin_(exclude), User.is_banned == False)
--    ).order_by(func.random()).limit(1)
-+    ).limit(limit)
-     result = await session.execute(stmt)
--    return result.scalar_one_or_none()
-\ No newline at end of file
-+    return result.scalars().all()
-\ No newline at end of file
 diff --git a/bot/database/models.py b/bot/database/models.py
-index eda829b..3b4f9d2 100644
+index 3b4f9d2..0d5e7c8 100644
 --- a/bot/database/models.py
 +++ b/bot/database/models.py
-@@ -13,6 +13,8 @@ class User(Base):
+@@ -13,8 +13,7 @@ class User(Base):
      city = Column(String(255), nullable=True)
      genre = Column(String(100), nullable=True)
      favorite_band = Column(String(255), nullable=True)
-+    favorite_tracks = Column(Text, nullable=True)
-+    taste_vector = Column(Text, nullable=True)
+-    favorite_tracks = Column(Text, nullable=True)
+-    taste_vector = Column(Text, nullable=True)
++    favorite_songs = Column(Text, nullable=True)
      preferred_gender = Column(String(50), nullable=True)
      bio = Column(Text, nullable=True)
      photo_file_id = Column(String(255), nullable=True)
 diff --git a/bot/handlers/browse.py b/bot/handlers/browse.py
-index 6e6fa97..6016d63 100644
+index 6016d63..2fbe9a7 100644
 --- a/bot/handlers/browse.py
 +++ b/bot/handlers/browse.py
-@@ -1,52 +1,50 @@
-+from typing import Union
- from aiogram import Router, F
--from aiogram.types import CallbackQuery, InputMediaPhoto
-+from aiogram.filters import Command
- from aiogram.fsm.context import FSMContext
-+from aiogram.types import CallbackQuery, InputMediaPhoto, Message
- from sqlalchemy.ext.asyncio import AsyncSession
- from database import crud
--from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, main_menu_keyboard
--from utils.helpers import format_user_card
-+from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard, main_menu_keyboard
+@@ -7,7 +7,7 @@ from database import crud
+ from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard, main_menu_keyboard
  from states.browse import Browse
--from aiogram.filters import Command
-+from utils.helpers import format_user_card
-+from utils.matching import pick_candidate
+ from utils.helpers import format_user_card
+-from utils.matching import pick_candidate
++from utils.matching import pick_candidate_simple
  
  router = Router()
  
--@router.callback_query(F.data == "browse")  # если оставим кнопку "Поиск" – но у нас её нет в меню, но можем добавить позже
--async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
--    # этот метод будет вызван, если мы добавим кнопку поиска, но пока в меню её нет, можно использовать как внутренний вызов
--    pass
- 
--# Но поскольку в новом меню нет кнопки "Поиск", мы можем сделать, чтобы при входе в бота (после регистрации) сразу показывалась анкета? 
--# Или добавим кнопку "Поиск" отдельно? Пользователь сказал: "В меню должны быть такие кнопки как: профиль, купить премиум, запустить mini-app, и лайки." – поиска нет в меню.
--# Значит, поиск будет запускаться автоматически после регистрации или через какую-то другую команду? Может, он подразумевает, что при старте бота после регистрации будет показываться анкета? 
--# Уточним. Но пока реализуем как отдельную команду /search или callback, чтобы было.
--
--# Я добавлю обработчик для команды /search, а также в меню можно будет добавить кнопку, но по ТЗ её нет – возможно, "лайки" и "поиск" объединены? 
--# В любом случае, предоставлю функционал, а ты потом прикрутишь.
--
--@router.message(Command("search"))
--async def search_command(message: Message, state: FSMContext, session: AsyncSession):
--    await show_candidate(message, state, session)
--
--async def show_candidate(event: Message or CallbackQuery, state: FSMContext, session: AsyncSession):
-+async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
-     user_id = event.from_user.id
-     user = await crud.get_user_by_telegram_id(session, user_id)
+@@ -19,7 +19,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
      if not user:
          await event.answer("Зарегистрируйтесь через /start")
          return
--    candidate = await crud.get_random_candidate(session, user.id)
-+    candidate, score = await pick_candidate(session, user)
+-    candidate, score = await pick_candidate(session, user)
++    candidate, score = await pick_candidate_simple(session, user)
      if not candidate:
          await event.answer("Нет больше анкет для показа.")
          return
-     await state.set_state(Browse.candidate_id)
-     await state.update_data(candidate_id=candidate.id)
--    is_premium = user.is_premium
--    text = format_user_card(candidate)
-+    text = format_user_card(candidate, score)
-+    markup = browse_actions_keyboard(user.is_premium)
-     if candidate.photo_file_id:
--        await event.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=browse_actions_keyboard(is_premium))
-+        await event.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
-     else:
--        await event.answer(text, reply_markup=browse_actions_keyboard(is_premium))
-+        await event.answer(text, reply_markup=markup)
-+
-+
-+@router.message(Command("search"))
-+async def search_command(message: Message, state: FSMContext, session: AsyncSession):
-+    await show_candidate(message, state, session)
-+
-+
-+@router.callback_query(F.data == "browse")
-+async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-+    await callback.message.delete()
-+    await show_candidate(callback.message, state, session)
-+    await callback.answer()
-+
+@@ -121,7 +121,7 @@ async def write_message(callback: CallbackQuery, state: FSMContext, session: Asy
  
--# Обработчики кнопок поиска
- @router.callback_query(F.data == "like", Browse.candidate_id)
- async def like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -62,13 +60,16 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
-         return
-     like = await crud.create_like(session, user.id, candidate.id)
-     if like.is_mutual:
--        await callback.bot.send_message(candidate.telegram_id,
--            f"🎉 Взаимность! Вы и {user.name or user.username} понравились друг другу.")
-+        await callback.bot.send_message(
-+            candidate.telegram_id,
-+            f"🎉 Взаимность! Вы и {user.name or user.username} понравились друг другу."
-+        )
-         await callback.answer("Это взаимно! 🎉")
-     else:
-         await callback.answer("Лайк поставлен!")
-     await show_next(callback, state, session)
- 
-+
- @router.callback_query(F.data == "skip", Browse.candidate_id)
- async def skip_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -78,6 +79,7 @@ async def skip_callback(callback: CallbackQuery, state: FSMContext, session: Asy
-         await crud.create_skip(session, user.id, candidate_id)
-     await show_next(callback, state, session)
- 
-+
- @router.callback_query(F.data == "report_user", Browse.candidate_id)
- async def report_user(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -85,7 +87,6 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
-     if not candidate_id:
-         await callback.answer("Нет анкеты.")
-         return
--    # Сохраним в состоянии, на кого жалуемся
-     await state.update_data(report_target=candidate_id)
-     await callback.message.edit_caption(
-         caption="Выберите причину жалобы:",
-@@ -93,7 +94,8 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
-     )
-     await callback.answer()
- 
--@router.callback_query(F.data.startswith("report_"))
-+
-+@router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
- async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     reason = callback.data.split("_", 1)[1]
-     data = await state.get_data()
-@@ -103,10 +105,11 @@ async def report_reason(callback: CallbackQuery, state: FSMContext, session: Asy
-         return
-     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-     await crud.create_report(session, user.id, target_id, reason)
--    await callback.message.edit_text("Жалоба отправлена. Спасибо.")
-+    await callback.answer("Жалоба отправлена. Спасибо.", show_alert=True)
-     await state.update_data(report_target=None)
-     await show_next(callback, state, session)
- 
-+
- @router.callback_query(F.data == "write_message", Browse.candidate_id)
- async def write_message(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -119,32 +122,34 @@ async def write_message(callback: CallbackQuery, state: FSMContext, session: Asy
-         await callback.answer("Эта функция доступна только с премиум-подпиской!", show_alert=True)
-         return
-     candidate = await crud.get_user_by_id(session, candidate_id)
--    # Отправляем сообщение через бота (можно сделать inline-кнопку с переходом в ЛС)
--    await callback.bot.send_message(candidate.telegram_id,
--        f"Пользователь {user.name or user.username} хочет написать вам. Напишите ему в ответ.")
-+    await callback.bot.send_message(
-+        candidate.telegram_id,
-+        f"Пользователь {user.name or user.username} хочет написать вам. Напишите ему в ответ."
-+    )
-     await callback.answer("Сообщение отправлено!")
- 
-+
  async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
      user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
--    candidate = await crud.get_random_candidate(session, user.id)
-+    candidate, score = await pick_candidate(session, user)
+-    candidate, score = await pick_candidate(session, user)
++    candidate, score = await pick_candidate_simple(session, user)
      if not candidate:
          await callback.message.edit_text("Нет больше анкет.", reply_markup=main_menu_keyboard())
          await state.clear()
-         await callback.answer()
-         return
-     await state.update_data(candidate_id=candidate.id)
--    is_premium = user.is_premium
--    text = format_user_card(candidate)
-+    text = format_user_card(candidate, score)
-+    markup = browse_actions_keyboard(user.is_premium)
-     if candidate.photo_file_id:
-         await callback.message.edit_media(
-             InputMediaPhoto(media=candidate.photo_file_id, caption=text),
--            reply_markup=browse_actions_keyboard(is_premium)
-+            reply_markup=markup
-         )
-     else:
--        await callback.message.edit_text(text, reply_markup=browse_actions_keyboard(is_premium))
-+        await callback.message.edit_text(text, reply_markup=markup)
-     await callback.answer()
- 
--# Обработчик просмотра профиля из карточки
-+
- @router.callback_query(F.data == "view_profile", Browse.candidate_id)
- async def view_profile_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -157,19 +162,17 @@ async def view_profile_callback(callback: CallbackQuery, state: FSMContext, sess
-         await callback.answer("Не найден.")
-         return
-     text = format_user_card(candidate) + "\n\n🛡️ Дополнительно:"
-+    markup = profile_actions_keyboard()
-     if candidate.photo_file_id:
-         await callback.message.edit_media(
-             InputMediaPhoto(media=candidate.photo_file_id, caption=text),
--            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
--                [InlineKeyboardButton(text="🔙 Назад к анкете", callback_data="back_to_browse")]
--            ])
-+            reply_markup=markup
-         )
-     else:
--        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
--            [InlineKeyboardButton(text="🔙 Назад к анкете", callback_data="back_to_browse")]
--        ]))
-+        await callback.message.edit_text(text, reply_markup=markup)
-     await callback.answer()
- 
-+
- @router.callback_query(F.data == "back_to_browse", Browse.candidate_id)
- async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     data = await state.get_data()
-@@ -182,13 +185,13 @@ async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: As
-         await callback.answer("Не найден.")
-         return
-     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
--    is_premium = user.is_premium
-     text = format_user_card(candidate)
-+    markup = browse_actions_keyboard(user.is_premium)
-     if candidate.photo_file_id:
-         await callback.message.edit_media(
-             InputMediaPhoto(media=candidate.photo_file_id, caption=text),
--            reply_markup=browse_actions_keyboard(is_premium)
-+            reply_markup=markup
-         )
-     else:
--        await callback.message.edit_text(text, reply_markup=browse_actions_keyboard(is_premium))
--    await callback.answer()
-\ No newline at end of file
-+        await callback.message.edit_text(text, reply_markup=markup)
-+    await callback.answer()
-diff --git a/bot/handlers/chats.py b/bot/handlers/chats.py
-index f322693..75c9f37 100644
---- a/bot/handlers/chats.py
-+++ b/bot/handlers/chats.py
-@@ -5,32 +5,38 @@ from database import crud
- 
- router = Router()
- 
-+
- @router.callback_query(F.data == "chats")
- async def chats_start(callback: CallbackQuery, session: AsyncSession):
-     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-     if not user:
--        await callback.answer("Register first.")
-+        await callback.answer("Зарегистрируйтесь через /start")
-         return
-     chats = await crud.get_chats_for_user(session, user.id)
-     if not chats:
--        await callback.message.edit_text("No chats yet.")
-+        await callback.message.edit_text(
-+            "У вас пока нет чатов.",
-+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
-+            ])
-+        )
-         await callback.answer()
-         return
--    text = "💬 Your chats:\n\n"
-+    text = "💬 Ваши чаты:\n\n"
-     buttons = []
-     for chat in chats:
-         other_id = chat.user2_id if chat.user1_id == user.id else chat.user1_id
-         other = await crud.get_user_by_id(session, other_id)
-         if not other:
-             continue
--        name = other.name or other.username
--        text += f"👤 {name}\n"
--        buttons.append([InlineKeyboardButton(text=f"Chat with {name}", callback_data=f"openchat_{other.id}")])
--    buttons.append([InlineKeyboardButton(text="🔙 Back", callback_data="main_menu")])
-+        name = other.name or other.username or "Пользователь"
-+        buttons.append([InlineKeyboardButton(text=f"Чат с {name}", callback_data=f"openchat_{other.id}")])
-+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")])
-     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-     await callback.message.edit_text(text, reply_markup=markup)
-     await callback.answer()
- 
-+
- @router.callback_query(F.data.startswith("openchat_"))
- async def open_chat_callback(callback: CallbackQuery):
--    await callback.answer("Chat coming soon!", show_alert=True)
-\ No newline at end of file
-+    await callback.answer("Функция чата скоро появится!", show_alert=True)
-diff --git a/bot/handlers/menu.py b/bot/handlers/menu.py
-index 4fc00b9..88ccb8e 100644
---- a/bot/handlers/menu.py
-+++ b/bot/handlers/menu.py
-@@ -1,5 +1,6 @@
- from aiogram import Router, F
- from aiogram.filters import Command
-+from aiogram.fsm.context import FSMContext
- from aiogram.types import Message, CallbackQuery
- from keyboards.inline import main_menu_keyboard
- 
-@@ -7,9 +8,14 @@ router = Router()
- 
- @router.message(Command("menu"))
- async def menu_command(message: Message):
--    await message.answer("Main menu:", reply_markup=main_menu_keyboard())
-+    await message.answer("Главное меню:", reply_markup=main_menu_keyboard())
- 
- @router.callback_query(F.data == "main_menu")
--async def main_menu_callback(callback: CallbackQuery):
--    await callback.message.edit_text("Main menu:", reply_markup=main_menu_keyboard())
-+async def main_menu_callback(callback: CallbackQuery, state: FSMContext):
-+    await state.clear()
-+    if callback.message.photo:
-+        await callback.message.delete()
-+        await callback.message.answer("Главное меню:", reply_markup=main_menu_keyboard())
-+    else:
-+        await callback.message.edit_text("Главное меню:", reply_markup=main_menu_keyboard())
-     await callback.answer()
-\ No newline at end of file
 diff --git a/bot/handlers/profile.py b/bot/handlers/profile.py
-index 909ec47..c23f467 100644
+index c23f467..d85b8f4 100644
 --- a/bot/handlers/profile.py
 +++ b/bot/handlers/profile.py
-@@ -6,61 +6,54 @@ from sqlalchemy.ext.asyncio import AsyncSession
- from database import crud
- from states.profile_edit import ProfileEdit
+@@ -8,7 +8,6 @@ from states.profile_edit import ProfileEdit
  from keyboards.inline import profile_view_keyboard, genre_keyboard, gender_keyboard, main_menu_keyboard
--from utils.helpers import validate_age
-+from utils.helpers import validate_age, format_profile
+ from utils.helpers import validate_age, format_profile
  from utils.media import save_photo
-+from utils.music_engine import resolve_tracks, engine, vector_to_json
+-from utils.music_engine import resolve_tracks, engine, vector_to_json
  
  router = Router()
  
-+EDIT_PROMPTS = {
-+    "name": "Введите новое имя (или 'Пропустить', чтобы оставить):",
-+    "age": "Введите новый возраст (18-99):",
-+    "city": "Введите новый город:",
-+    "band": "Введите любимую группу (или 'Пропустить'):",
-+    "bio": "Введите новое био:",
+@@ -18,7 +17,7 @@ EDIT_PROMPTS = {
+     "city": "Введите новый город:",
+     "band": "Введите любимую группу (или 'Пропустить'):",
+     "bio": "Введите новое био:",
+-    "photo": "Отправьте новое фото (или 'Пропустить'):",
+-    "tracks": "Назовите 2-3 любимые песни через запятую (или 'Пропустить', чтобы оставить как есть):",
 +    "photo": "Отправьте новое фото (или 'Пропустить'):",
-+    "tracks": "Назовите 2-3 любимые песни через запятую (или 'Пропустить', чтобы оставить как есть):",
-+}
-+
-+
++    "songs": "Введите ваши любимые песни (можно несколько, через запятую):",
+ }
+ 
  @router.callback_query(F.data == "profile")
- async def profile_view(callback: CallbackQuery, session: AsyncSession):
-     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-     if not user:
-         await callback.answer("Зарегистрируйтесь через /start")
-         return
--    text = f"👤 Ваш профиль:\n\n"
--    text += f"Имя: {user.name or 'Не указано'}\n"
--    text += f"Возраст: {user.age or 'Не указан'}\n"
--    text += f"Город: {user.city or 'Не указан'}\n"
--    text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
--    text += f"Любимая группа: {user.favorite_band or 'Не указана'}\n"
--    text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
--    text += f"Био: {user.bio or 'Не указано'}\n"
--    text += f"Премиум: {'✅' if user.is_premium else '❌'}"
-+    text = format_profile(user)
-+    await callback.message.delete()
-     if user.photo_file_id:
-         await callback.message.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_view_keyboard())
-     else:
--        await callback.message.edit_text(text, reply_markup=profile_view_keyboard())
-+        await callback.message.answer(text, reply_markup=profile_view_keyboard())
+@@ -92,27 +91,15 @@ async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncS
      await callback.answer()
  
-+
- @router.callback_query(F.data.startswith("edit_"))
- async def edit_field(callback: CallbackQuery, state: FSMContext):
--    field = callback.data.split("_")[1]
--    if field == "name":
--        await state.set_state(ProfileEdit.name)
--        await callback.message.edit_text("Введите новое имя (или 'Пропустить', чтобы оставить):")
--    elif field == "age":
--        await state.set_state(ProfileEdit.age)
--        await callback.message.edit_text("Введите новый возраст (18-99):")
--    elif field == "city":
--        await state.set_state(ProfileEdit.city)
--        await callback.message.edit_text("Введите новый город:")
--    elif field == "genre":
-+    field = callback.data.split("_", 1)[1]
-+    await callback.message.delete()
-+    if field == "genre":
-         await state.set_state(ProfileEdit.genre)
--        await callback.message.edit_text("Выберите жанр:", reply_markup=genre_keyboard())
--    elif field == "band":
--        await state.set_state(ProfileEdit.band)
--        await callback.message.edit_text("Введите любимую группу (или 'Пропустить'):")
-+        await callback.message.answer("Выберите жанр:", reply_markup=genre_keyboard())
-     elif field == "gender":
-         await state.set_state(ProfileEdit.gender)
--        await callback.message.edit_text("Выберите пол партнера:", reply_markup=gender_keyboard())
--    elif field == "bio":
--        await state.set_state(ProfileEdit.bio)
--        await callback.message.edit_text("Введите новое био:")
--    elif field == "photo":
--        await state.set_state(ProfileEdit.photo)
--        await callback.message.edit_text("Отправьте новое фото (или 'Пропустить'):")
-+        await callback.message.answer("Выберите пол партнера:", reply_markup=gender_keyboard())
-+    elif field in EDIT_PROMPTS:
-+        await state.set_state(getattr(ProfileEdit, field))
-+        await callback.message.answer(EDIT_PROMPTS[field])
-     await callback.answer()
  
-+
- @router.message(ProfileEdit.name)
- async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
-     name = None if message.text.lower() == "пропустить" else message.text
-@@ -69,6 +62,7 @@ async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
-     await state.clear()
-     await message.answer("Имя обновлено!", reply_markup=main_menu_keyboard())
- 
-+
- @router.message(ProfileEdit.age)
- async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
-     if not validate_age(message.text):
-@@ -79,6 +73,7 @@ async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
-     await state.clear()
-     await message.answer("Возраст обновлён!", reply_markup=main_menu_keyboard())
- 
-+
- @router.message(ProfileEdit.city)
- async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
+-@router.message(ProfileEdit.tracks)
+-async def edit_tracks(message: Message, state: FSMContext, session: AsyncSession):
++@router.message(ProfileEdit.songs)
++async def edit_songs(message: Message, state: FSMContext, session: AsyncSession):
      user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-@@ -86,6 +81,7 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
+-    if message.text.lower() == "пропустить":
+-        await state.clear()
+-        await message.answer("Оставили как было.", reply_markup=main_menu_keyboard())
+-        return
+-    names = message.text.split(",")
+-    matched, unmatched = resolve_tracks(names)
+-    if not matched:
+-        await message.answer("Ни одна песня не найдена. Попробуйте ещё раз или отправьте 'Пропустить'.")
+-        return
+-    indices = [m["index"] for m in matched]
+-    vector = engine.build_taste_vector(indices)
+-    tracks_display = "; ".join(f"{m['track_name']} — {m['artist']}" for m in matched)
+-    await crud.update_user(session, user, favorite_tracks=tracks_display, taste_vector=vector_to_json(vector))
+-    reply = "Любимые песни обновлены: " + tracks_display
+-    if unmatched:
+-        reply += "\nНе нашли: " + ", ".join(unmatched)
++    songs = message.text if message.text.lower() != "пропустить" else None
++    if songs:
++        await crud.update_user(session, user, favorite_songs=songs)
++        await message.answer("Любимые песни обновлены!")
      await state.clear()
-     await message.answer("Город обновлён!", reply_markup=main_menu_keyboard())
+-    await message.answer(reply, reply_markup=main_menu_keyboard())
++    await message.answer("Изменения сохранены.", reply_markup=main_menu_keyboard())
  
-+
- @router.callback_query(StateFilter(ProfileEdit.genre), F.data.startswith("genre_"))
- async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     genre = callback.data.split("_", 1)[1]
-@@ -95,6 +91,29 @@ async def edit_genre(callback: CallbackQuery, state: FSMContext, session: AsyncS
-     await callback.message.edit_text("Жанр обновлён!", reply_markup=main_menu_keyboard())
-     await callback.answer()
- 
-+
-+@router.message(ProfileEdit.tracks)
-+async def edit_tracks(message: Message, state: FSMContext, session: AsyncSession):
-+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-+    if message.text.lower() == "пропустить":
-+        await state.clear()
-+        await message.answer("Оставили как было.", reply_markup=main_menu_keyboard())
-+        return
-+    names = message.text.split(",")
-+    matched, unmatched = resolve_tracks(names)
-+    if not matched:
-+        await message.answer("Ни одна песня не найдена. Попробуйте ещё раз или отправьте 'Пропустить'.")
-+        return
-+    indices = [m["index"] for m in matched]
-+    vector = engine.build_taste_vector(indices)
-+    tracks_display = "; ".join(f"{m['track_name']} — {m['artist']}" for m in matched)
-+    await crud.update_user(session, user, favorite_tracks=tracks_display, taste_vector=vector_to_json(vector))
-+    reply = "Любимые песни обновлены: " + tracks_display
-+    if unmatched:
-+        reply += "\nНе нашли: " + ", ".join(unmatched)
-+    await state.clear()
-+    await message.answer(reply, reply_markup=main_menu_keyboard())
-+
  @router.message(ProfileEdit.band)
  async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
-     band = None if message.text.lower() == "пропустить" else message.text
-@@ -103,6 +122,7 @@ async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
-     await state.clear()
-     await message.answer("Группа обновлена!", reply_markup=main_menu_keyboard())
- 
-+
- @router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
- async def edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-     gender = callback.data.split("_", 1)[1]
-@@ -112,6 +132,7 @@ async def edit_gender(callback: CallbackQuery, state: FSMContext, session: Async
-     await callback.message.edit_text("Пол партнера обновлён!", reply_markup=main_menu_keyboard())
-     await callback.answer()
- 
-+
- @router.message(ProfileEdit.bio)
- async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
-     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-@@ -119,18 +140,17 @@ async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
-     await state.clear()
-     await message.answer("Био обновлено!", reply_markup=main_menu_keyboard())
- 
-+
- @router.message(ProfileEdit.photo, F.content_type.in_({ContentType.PHOTO, ContentType.TEXT}))
- async def edit_photo(message: Message, state: FSMContext, session: AsyncSession):
-+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-     if message.content_type == ContentType.PHOTO:
-         photo = message.photo[-1]
--        file_id = photo.file_id
-         await save_photo(photo, message.from_user.id)
-+        await crud.update_user(session, user, photo_file_id=photo.file_id)
-     else:
-         if message.text.lower() != "пропустить":
-             await message.answer("Отправьте фото или 'Пропустить'")
-             return
--        file_id = None
--    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
--    await crud.update_user(session, user, photo_file_id=file_id)
-     await state.clear()
--    await message.answer("Фото обновлено!", reply_markup=main_menu_keyboard())
-\ No newline at end of file
-+    await message.answer("Фото обновлено!", reply_markup=main_menu_keyboard())
-diff --git a/bot/handlers/report.py b/bot/handlers/report.py
-index 2bad78b..1e22eb6 100644
---- a/bot/handlers/report.py
-+++ b/bot/handlers/report.py
-@@ -1,29 +1,3 @@
--from aiogram import Router, F
--from aiogram.types import CallbackQuery
--from aiogram.fsm.context import FSMContext
--from sqlalchemy.ext.asyncio import AsyncSession
--from database import crud
--from keyboards.inline import main_menu_keyboard, report_reason_keyboard
--from states.browse import Browse
-+from aiogram import Router
- 
- router = Router()
--
--@router.callback_query(F.data.startswith("report_"))
--async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
--    reason = callback.data.split("_", 1)[1]
--    data = await state.get_data()
--    candidate_id = data.get("candidate_id")
--    if not candidate_id:
--        await callback.answer("No user to report.")
--        return
--    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
--    await crud.create_report(session, user.id, candidate_id, reason)
--    await callback.message.edit_text("Report submitted. Thank you.", reply_markup=main_menu_keyboard())
--    await state.clear()
--    await callback.answer()
--
--@router.callback_query(F.data == "cancel")
--async def cancel_report(callback: CallbackQuery, state: FSMContext):
--    await state.clear()
--    await callback.message.edit_text("Cancelled.", reply_markup=main_menu_keyboard())
--    await callback.answer()
-\ No newline at end of file
 diff --git a/bot/handlers/start.py b/bot/handlers/start.py
-index 4f12f49..f29a3f6 100644
+index f29a3f6..a52d8a1 100644
 --- a/bot/handlers/start.py
 +++ b/bot/handlers/start.py
-@@ -4,11 +4,11 @@ from aiogram.fsm.context import FSMContext
- from aiogram.types import Message, CallbackQuery, ContentType
- from sqlalchemy.ext.asyncio import AsyncSession
- from database import crud
--from database.db import get_db
- from states.registration import Registration
+@@ -8,7 +8,6 @@ from states.registration import Registration
  from keyboards.inline import main_menu_keyboard, genre_keyboard, gender_keyboard
  from utils.helpers import validate_age
  from utils.media import save_photo
-+from utils.music_engine import resolve_tracks, engine, vector_to_json
+-from utils.music_engine import resolve_tracks, engine, vector_to_json
  
  router = Router()
  
-@@ -48,10 +48,36 @@ async def reg_city(message: Message, state: FSMContext):
+@@ -48,35 +47,17 @@ async def reg_city(message: Message, state: FSMContext):
  async def reg_genre(callback: CallbackQuery, state: FSMContext):
      genre = callback.data.split("_", 1)[1]
      await state.update_data(genre=genre)
--    await state.set_state(Registration.band)
--    await callback.message.edit_text("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
-+    await state.set_state(Registration.tracks)
-+    await callback.message.edit_text(
-+        "Назовите 2-3 любимые песни через запятую — так мы подберём вам пару со схожим вкусом.\n"
-+        "Например: Bohemian Rhapsody, Yesterday\n(или отправьте 'Пропустить')"
-+    )
+-    await state.set_state(Registration.tracks)
++    await state.set_state(Registration.songs)
+     await callback.message.edit_text(
+-        "Назовите 2-3 любимые песни через запятую — так мы подберём вам пару со схожим вкусом.\n"
+-        "Например: Bohemian Rhapsody, Yesterday\n(или отправьте 'Пропустить')"
++        "Введите ваши любимые песни (можно несколько, через запятую).\n"
++        "Это поможет нам найти людей с похожим вкусом.\n(или отправьте 'Пропустить')"
+     )
      await callback.answer()
  
-+@router.message(Registration.tracks)
-+async def reg_tracks(message: Message, state: FSMContext):
-+    if message.text.lower() == "пропустить":
-+        await state.update_data(taste_vector=None, favorite_tracks=None)
-+        await state.set_state(Registration.band)
-+        await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
-+        return
-+    names = message.text.split(",")
-+    matched, unmatched = resolve_tracks(names)
-+    if not matched:
-+        await message.answer("Ни одна песня не найдена в базе. Попробуйте ещё раз или отправьте 'Пропустить'.")
-+        return
-+    indices = [m["index"] for m in matched]
-+    vector = engine.build_taste_vector(indices)
-+    tracks_display = [f"{m['track_name']} — {m['artist']}" for m in matched]
-+    await state.update_data(taste_vector=vector_to_json(vector), favorite_tracks="; ".join(tracks_display))
-+    reply = "Нашли: " + ", ".join(tracks_display)
-+    if unmatched:
-+        reply += "\nНе нашли: " + ", ".join(unmatched)
-+    await message.answer(reply)
-+    await state.set_state(Registration.band)
-+    await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
-+
- @router.message(Registration.band)
- async def reg_band(message: Message, state: FSMContext):
-     band = None if message.text.lower() == "пропустить" else message.text
-@@ -61,7 +87,7 @@ async def reg_band(message: Message, state: FSMContext):
+-@router.message(Registration.tracks)
+-async def reg_tracks(message: Message, state: FSMContext):
+-    if message.text.lower() == "пропустить":
+-        await state.update_data(taste_vector=None, favorite_tracks=None)
+-        await state.set_state(Registration.band)
+-        await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
+-        return
+-    names = message.text.split(",")
+-    matched, unmatched = resolve_tracks(names)
+-    if not matched:
+-        await message.answer("Ни одна песня не найдена в базе. Попробуйте ещё раз или отправьте 'Пропустить'.")
+-        return
+-    indices = [m["index"] for m in matched]
+-    vector = engine.build_taste_vector(indices)
+-    tracks_display = [f"{m['track_name']} — {m['artist']}" for m in matched]
+-    await state.update_data(taste_vector=vector_to_json(vector), favorite_tracks="; ".join(tracks_display))
+-    reply = "Нашли: " + ", ".join(tracks_display)
+-    if unmatched:
+-        reply += "\nНе нашли: " + ", ".join(unmatched)
+-    await message.answer(reply)
++@router.message(Registration.songs)
++async def reg_songs(message: Message, state: FSMContext):
++    songs = None if message.text.lower() == "пропустить" else message.text
++    await state.update_data(favorite_songs=songs)
+     await state.set_state(Registration.band)
+     await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
  
- @router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("gender_"))
- async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
--    gender = callback.data.split("_", 1)[1]  # male, female, any
-+    gender = callback.data.split("_", 1)[1]
-     await state.update_data(preferred_gender=gender)
-     await state.set_state(Registration.bio)
-     await callback.message.edit_text("Расскажите немного о себе (био):")
-@@ -85,7 +111,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
-             await message.answer("Отправьте фото или 'Пропустить'")
-             return
-     data = await state.get_data()
--    user = await crud.create_user(
-+    await crud.create_user(
-         session,
-         telegram_id=message.from_user.id,
-         username=message.from_user.username,
-@@ -94,6 +120,8 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
+@@ -120,8 +101,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
          city=data.get("city"),
          genre=data.get("genre"),
          favorite_band=data.get("favorite_band"),
-+        favorite_tracks=data.get("favorite_tracks"),
-+        taste_vector=data.get("taste_vector"),
+-        favorite_tracks=data.get("favorite_tracks"),
+-        taste_vector=data.get("taste_vector"),
++        favorite_songs=data.get("favorite_songs"),
          preferred_gender=data.get("preferred_gender"),
          bio=data.get("bio"),
          photo_file_id=photo_file_id,
-@@ -106,4 +134,4 @@ async def cancel_callback(callback: CallbackQuery, state: FSMContext):
-     await state.clear()
-     await callback.message.edit_text("Отменено.")
-     await callback.message.answer("Главное меню:", reply_markup=main_menu_keyboard())
--    await callback.answer()
-\ No newline at end of file
-+    await callback.answer()
 diff --git a/bot/keyboards/inline.py b/bot/keyboards/inline.py
-index 1a2499f..bff88f7 100644
+index bff88f7..c3c8a9f 100644
 --- a/bot/keyboards/inline.py
 +++ b/bot/keyboards/inline.py
-@@ -2,10 +2,12 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
- 
- def main_menu_keyboard():
-     buttons = [
--        [InlineKeyboardButton(text="Профиль", callback_data="profile")],
--        [InlineKeyboardButton(text="Купить премиум", callback_data="premium")],
--        [InlineKeyboardButton(text="Запустить Mini-App", web_app={"url": "https://your-domain.com/MuseTwinDate/"})],
--        [InlineKeyboardButton(text="Лайки", callback_data="likes")],
-+        [InlineKeyboardButton(text="🔍 Поиск", callback_data="browse")],
-+        [InlineKeyboardButton(text="👤 Профиль", callback_data="profile")],
-+        [InlineKeyboardButton(text="❤️ Лайки", callback_data="likes")],
-+        [InlineKeyboardButton(text="💬 Чаты", callback_data="chats")],
-+        [InlineKeyboardButton(text="⭐ Купить премиум", callback_data="premium")],
-+        [InlineKeyboardButton(text="🎵 Запустить Mini-App", web_app={"url": "https://your-domain.com/MuseTwinDate/"})],
-     ]
-     return InlineKeyboardMarkup(inline_keyboard=buttons)
- 
-@@ -17,9 +19,10 @@ def profile_view_keyboard():
+@@ -19,7 +19,7 @@ def profile_view_keyboard():
           InlineKeyboardButton(text="Жанр", callback_data="edit_genre")],
          [InlineKeyboardButton(text="Группа", callback_data="edit_band"),
           InlineKeyboardButton(text="Пол партнера", callback_data="edit_gender")],
--        [InlineKeyboardButton(text="Био", callback_data="edit_bio"),
--         InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
--        [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
-+        [InlineKeyboardButton(text="Треки", callback_data="edit_tracks"),
-+         InlineKeyboardButton(text="Био", callback_data="edit_bio")],
-+        [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
-+        [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
-     ]
-     return InlineKeyboardMarkup(inline_keyboard=buttons)
- 
-@@ -46,21 +49,32 @@ def browse_actions_keyboard(is_premium: bool = False):
-     ]
-     if is_premium:
-         buttons.append([InlineKeyboardButton(text="💬 Написать в ЛС", callback_data="write_message")])
--    buttons.append([InlineKeyboardButton(text="🚫 Пожаловаться", callback_data="report_user")])
--    buttons.append([InlineKeyboardButton(text="Профиль", callback_data="view_profile")])
-+    buttons.append([InlineKeyboardButton(text="👤 Профиль", callback_data="view_profile"),
-+                     InlineKeyboardButton(text="🚫 Пожаловаться", callback_data="report_user")])
-+    return InlineKeyboardMarkup(inline_keyboard=buttons)
-+
-+def profile_actions_keyboard():
-+    buttons = [
-+        [InlineKeyboardButton(text="🔙 Назад к анкете", callback_data="back_to_browse")]
-+    ]
-     return InlineKeyboardMarkup(inline_keyboard=buttons)
- 
- def likes_action_keyboard(user_id: int):
-     buttons = [
--        [InlineKeyboardButton(text="Взаимно", callback_data=f"likeback_{user_id}")],
--        [InlineKeyboardButton(text="Пропустить", callback_data=f"skip_like_{user_id}")],
--        [InlineKeyboardButton(text="Назад", callback_data="likes_back")]
-+        [InlineKeyboardButton(text="❤️ Взаимно", callback_data=f"likeback_{user_id}")],
-+        [InlineKeyboardButton(text="⏩ Пропустить", callback_data=f"skip_like_{user_id}")],
-+        [InlineKeyboardButton(text="🔙 Назад", callback_data="likes_back")]
-     ]
-     return InlineKeyboardMarkup(inline_keyboard=buttons)
- 
- def report_reason_keyboard():
--    reasons = ["Спам", "Неприемлемо", "Фейк", "Другое"]
--    buttons = [[InlineKeyboardButton(text=r, callback_data=f"report_{r}")] for r in reasons]
-+    reasons = [
-+        ("Спам", "spam"),
-+        ("Неприемлемый контент", "inappropriate"),
-+        ("Фейковый профиль", "fake"),
-+        ("Другое", "other"),
-+    ]
-+    buttons = [[InlineKeyboardButton(text=label, callback_data=f"reportreason_{value}")] for label, value in reasons]
-     buttons.append([InlineKeyboardButton(text="🔙 Отмена", callback_data="cancel")])
-     return InlineKeyboardMarkup(inline_keyboard=buttons)
- 
-@@ -70,4 +84,4 @@ def premium_plans_keyboard():
-         [InlineKeyboardButton(text="3 месяца – 250 ⭐", callback_data="premium_3")],
+-        [InlineKeyboardButton(text="Треки", callback_data="edit_tracks"),
++        [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
+          InlineKeyboardButton(text="Био", callback_data="edit_bio")],
+         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
          [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
-     ]
--    return InlineKeyboardMarkup(inline_keyboard=buttons)
-\ No newline at end of file
-+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 diff --git a/bot/requirements.txt b/bot/requirements.txt
-index ff7bbc0..c789202 100644
+index c789202..7c9e0a4 100644
 --- a/bot/requirements.txt
 +++ b/bot/requirements.txt
-@@ -1,8 +1,11 @@
--aiogram==3.3.0
-+aiogram==3.19.0
- sqlalchemy==2.0.25
- asyncpg==0.29.0
- aiosqlite==0.19.0
+@@ -5,7 +5,4 @@ aiosqlite==0.19.0
  python-dotenv==1.0.0
  alembic==1.13.0
  pydantic==2.5.0
--aioredis==2.0.1
+-redis==5.0.1
+-pandas==2.2.0
+-numpy==1.26.4
+-scikit-learn==1.4.0
 \ No newline at end of file
 +redis==5.0.1
-+pandas==2.2.0
-+numpy==1.26.4
-+scikit-learn==1.4.0
 \ No newline at end of file
 diff --git a/bot/states/profile_edit.py b/bot/states/profile_edit.py
-index 07393a8..72f94a5 100644
+index 72f94a5..e2f5a6b 100644
 --- a/bot/states/profile_edit.py
 +++ b/bot/states/profile_edit.py
-@@ -5,7 +5,8 @@ class ProfileEdit(StatesGroup):
+@@ -5,7 +5,7 @@ class ProfileEdit(StatesGroup):
      age = State()
      city = State()
      genre = State()
-+    tracks = State()
+-    tracks = State()
++    songs = State()
      band = State()
      gender = State()
      bio = State()
--    photo = State()
-\ No newline at end of file
-+    photo = State()
 diff --git a/bot/states/registration.py b/bot/states/registration.py
-index 0a610fb..3cc12a1 100644
+index 3cc12a1..9d72a2a 100644
 --- a/bot/states/registration.py
 +++ b/bot/states/registration.py
-@@ -5,7 +5,8 @@ class Registration(StatesGroup):
+@@ -5,7 +5,7 @@ class Registration(StatesGroup):
      age = State()
      city = State()
      genre = State()
--    band = State()         
-+    tracks = State()
-+    band = State()
+-    tracks = State()
++    songs = State()
+     band = State()
      preferred_gender = State()
      bio = State()
--    photo = State()
-\ No newline at end of file
-+    photo = State()
 diff --git a/bot/utils/helpers.py b/bot/utils/helpers.py
-index 609a095..c723f78 100644
+index c723f78..f2b7f02 100644
 --- a/bot/utils/helpers.py
 +++ b/bot/utils/helpers.py
-@@ -5,7 +5,7 @@ def validate_age(age_str: str) -> bool:
-     except ValueError:
-         return False
- 
--def format_user_card(user) -> str:
-+def format_user_card(user, match_score: float = None) -> str:
-     text = f"👤 {user.name or 'No name'}\n"
-     if user.age:
-         text += f"🎂 {user.age} years old\n"
-@@ -13,6 +13,25 @@ def format_user_card(user) -> str:
-         text += f"📍 {user.city}\n"
-     if user.genre:
+@@ -15,8 +15,8 @@ def format_user_card(user, match_score: float = None) -> str:
          text += f"🎵 {user.genre}\n"
-+    if user.favorite_band:
-+        text += f"🎤 {user.favorite_band}\n"
-+    if user.favorite_tracks:
-+        text += f"🎧 {user.favorite_tracks}\n"
+     if user.favorite_band:
+         text += f"🎤 {user.favorite_band}\n"
+-    if user.favorite_tracks:
+-        text += f"🎧 {user.favorite_tracks}\n"
++    if user.favorite_songs:
++        text += f"🎧 {user.favorite_songs}\n"
      if user.bio:
          text += f"📝 {user.bio}\n"
--    return text
-\ No newline at end of file
-+    if match_score is not None and match_score > 0:
-+        text += f"🎯 Совпадение вкуса: {round(match_score * 100)}%\n"
-+    return text
-+
-+def format_profile(user) -> str:
-+    text = "👤 Ваш профиль:\n\n"
-+    text += f"Имя: {user.name or 'Не указано'}\n"
-+    text += f"Возраст: {user.age or 'Не указан'}\n"
-+    text += f"Город: {user.city or 'Не указан'}\n"
-+    text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
-+    text += f"Любимая группа: {user.favorite_band or 'Не указана'}\n"
-+    text += f"Любимые песни: {user.favorite_tracks or 'Не указаны'}\n"
-+    text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
-+    text += f"Био: {user.bio or 'Не указано'}\n"
-+    text += f"Премиум: {'✅' if user.is_premium else '❌'}"
-+    return text
+     if match_score is not None and match_score > 0:
+@@ -30,7 +30,7 @@ def format_profile(user) -> str:
+     text += f"Город: {user.city or 'Не указан'}\n"
+     text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
+     text += f"Любимая группа: {user.favorite_band or 'Не указана'}\n"
+-    text += f"Любимые песни: {user.favorite_tracks or 'Не указаны'}\n"
++    text += f"Любимые песни: {user.favorite_songs or 'Не указаны'}\n"
+     text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
+     text += f"Био: {user.bio or 'Не указано'}\n"
+     text += f"Премиум: {'✅' if user.is_premium else '❌'}"
 diff --git a/bot/utils/matching.py b/bot/utils/matching.py
-new file mode 100644
-index 0000000..ac28df9
---- /dev/null
+index ac28df9..b5c5a23 100644
+--- a/bot/utils/matching.py
 +++ b/bot/utils/matching.py
-@@ -0,0 +1,23 @@
-+import random
-+from typing import Optional, Tuple
-+from sqlalchemy.ext.asyncio import AsyncSession
-+from database import crud
-+from database.models import User
-+from utils.music_engine import vector_from_json, engine
+@@ -1,23 +1,55 @@
+ import random
++import re
+ from typing import Optional, Tuple
+ from sqlalchemy.ext.asyncio import AsyncSession
+ from database import crud
+ from database.models import User
+-from utils.music_engine import vector_from_json, engine
+ 
+-BASELINE_WEIGHT = 0.05
+-
+-
+-async def pick_candidate(session: AsyncSession, user: User) -> Tuple[Optional[User], float]:
++async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Optional[User], float]:
+     pool = await crud.get_candidate_pool(session, user.id)
+     if not pool:
+         return None, 0.0
+-    user_vector = vector_from_json(user.taste_vector)
+-    if not user_vector:
+-        return random.choice(pool), 0.0
+-    scored = [(c, engine.similarity(user_vector, vector_from_json(c.taste_vector))) for c in pool]
+-    candidates = [c for c, _ in scored]
+-    weights = [max(s, 0.0) + BASELINE_WEIGHT for _, s in scored]
+-    chosen = random.choices(candidates, weights=weights, k=1)[0]
+-    chosen_score = next(s for c, s in scored if c is chosen)
+-    return chosen, chosen_score
 +
-+BASELINE_WEIGHT = 0.05
++    user_keywords = set()
++    if user.genre:
++        user_keywords.add(user.genre.lower())
++    if user.favorite_band:
++        user_keywords.update(re.split(r'[,\s]+', user.favorite_band.lower()))
++    if user.favorite_songs:
++        user_keywords.update(re.split(r'[,\s]+', user.favorite_songs.lower()))
 +
++    scored = []
++    for candidate in pool:
++        score = 0.0
++        cand_keywords = set()
++        if candidate.genre:
++            cand_keywords.add(candidate.genre.lower())
++        if candidate.favorite_band:
++            cand_keywords.update(re.split(r'[,\s]+', candidate.favorite_band.lower()))
++        if candidate.favorite_songs:
++            cand_keywords.update(re.split(r'[,\s]+', candidate.favorite_songs.lower()))
 +
-+async def pick_candidate(session: AsyncSession, user: User) -> Tuple[Optional[User], float]:
-+    pool = await crud.get_candidate_pool(session, user.id)
-+    if not pool:
-+        return None, 0.0
-+    user_vector = vector_from_json(user.taste_vector)
-+    if not user_vector:
++        common = user_keywords & cand_keywords
++        if common:
++            score = len(common) / max(len(user_keywords), 1)
++        # бонус за совпадение жанра (если не учтён в ключевых словах, но обычно учтён)
++        if user.genre and candidate.genre and user.genre.lower() == candidate.genre.lower():
++            score += 0.3
++        # если есть группа, дополнительный бонус
++        if user.favorite_band and candidate.favorite_band:
++            if user.favorite_band.lower() == candidate.favorite_band.lower():
++                score += 0.5
++        scored.append((candidate, min(score, 1.0)))
++
++    if not scored:
 +        return random.choice(pool), 0.0
-+    scored = [(c, engine.similarity(user_vector, vector_from_json(c.taste_vector))) for c in pool]
-+    candidates = [c for c, _ in scored]
-+    weights = [max(s, 0.0) + BASELINE_WEIGHT for _, s in scored]
-+    chosen = random.choices(candidates, weights=weights, k=1)[0]
-+    chosen_score = next(s for c, s in scored if c is chosen)
-+    return chosen, chosen_score
++
++    # Отбираем кандидатов с максимальным скором
++    max_score = max(s for _, s in scored)
++    best_candidates = [c for c, s in scored if s == max_score]
++    if max_score == 0:
++        # если совпадений нет, берём случайного
++        return random.choice(pool), 0.0
++    chosen = random.choice(best_candidates)
++    return chosen, max_score
 diff --git a/bot/utils/music_engine.py b/bot/utils/music_engine.py
-new file mode 100644
-index 0000000..ce2a32b
---- /dev/null
-+++ b/bot/utils/music_engine.py
-@@ -0,0 +1,97 @@
-+import json
-+import logging
-+from pathlib import Path
-+from typing import List, Optional
-+
-+import numpy as np
-+import pandas as pd
-+from sklearn.metrics.pairwise import cosine_similarity
-+from sklearn.preprocessing import MinMaxScaler
-+
-+from config import config
-+
-+logger = logging.getLogger(__name__)
-+
-+FEATURE_COLUMNS = [
-+    "popularity", "danceability", "energy", "key", "loudness", "mode",
-+    "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo",
-+]
-+
-+
-+class MusicEngine:
-+    def __init__(self, dataset_path: str):
-+        self.available = False
-+        try:
-+            self.df = pd.read_csv(dataset_path)
-+            self.df = self.df.drop_duplicates(subset=["track_name", "artists"]).reset_index(drop=True)
-+            features = self.df[FEATURE_COLUMNS].apply(pd.to_numeric, errors="coerce").fillna(0)
-+            scaler = MinMaxScaler()
-+            self.scaled = pd.DataFrame(scaler.fit_transform(features), columns=FEATURE_COLUMNS, index=self.df.index)
-+            self.available = True
-+            logger.info(f"MusicEngine loaded {len(self.df)} tracks")
-+        except Exception as e:
-+            logger.warning(f"MusicEngine dataset not loaded: {e}")
-+            self.df = pd.DataFrame(columns=["track_name", "artists", "track_genre"])
-+            self.scaled = pd.DataFrame(columns=FEATURE_COLUMNS)
-+
-+    def search_track(self, track_name: str, artist: Optional[str] = None) -> Optional[dict]:
-+        if not self.available or not track_name:
-+            return None
-+        mask = self.df["track_name"].str.contains(track_name, case=False, na=False, regex=False)
-+        if artist:
-+            mask &= self.df["artists"].str.lower() == artist.lower()
-+        matches = self.df[mask]
-+        if matches.empty:
-+            return None
-+        best = matches.sort_values("popularity", ascending=False).iloc[0]
-+        return {
-+            "index": int(best.name),
-+            "track_name": str(best["track_name"]),
-+            "artist": str(best["artists"]),
-+            "genre": str(best["track_genre"]),
-+        }
-+
-+    def get_track_vector(self, index: int) -> Optional[List[float]]:
-+        if not self.available or index not in self.scaled.index:
-+            return None
-+        return self.scaled.loc[index].tolist()
-+
-+    def build_taste_vector(self, indices: List[int]) -> Optional[List[float]]:
-+        vectors = [self.get_track_vector(i) for i in indices]
-+        vectors = [v for v in vectors if v is not None]
-+        if not vectors:
-+            return None
-+        return np.mean(vectors, axis=0).tolist()
-+
-+    @staticmethod
-+    def similarity(vec_a: Optional[list], vec_b: Optional[list]) -> float:
-+        if not vec_a or not vec_b:
-+            return 0.0
-+        a = np.array(vec_a).reshape(1, -1)
-+        b = np.array(vec_b).reshape(1, -1)
-+        return float(cosine_similarity(a, b)[0][0])
-+
-+
-+def resolve_tracks(names: List[str]):
-+    matched, unmatched = [], []
-+    for name in names:
-+        name = name.strip()
-+        if not name:
-+            continue
-+        result = engine.search_track(name)
-+        if result:
-+            matched.append(result)
-+        else:
-+            unmatched.append(name)
-+    return matched, unmatched
-+
-+
-+def vector_to_json(vector: Optional[list]) -> Optional[str]:
-+    return json.dumps(vector) if vector else None
-+
-+
-+def vector_from_json(data: Optional[str]) -> Optional[list]:
-+    return json.loads(data) if data else None
-+
-+
-+engine = MusicEngine(config.MUSIC_DATASET_PATH)
+deleted file mode 100644
+index ce2a32b..0000000
+--- a/bot/utils/music_engine.py
++++ /dev/null
+@@ -1,97 +0,0 @@
+-import json
+-import logging
+-from pathlib import Path
+-from typing import List, Optional
+-
+-import numpy as np
+-import pandas as pd
+-from sklearn.metrics.pairwise import cosine_similarity
+-from sklearn.preprocessing import MinMaxScaler
+-
+-from config import config
+-
+-logger = logging.getLogger(__name__)
+-
+-FEATURE_COLUMNS = [
+-    "popularity", "danceability", "energy", "key", "loudness", "mode",
+-    "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo",
+-]
+-
+-class MusicEngine:
+-    def __init__(self, dataset_path: str):
+-        self.available = False
+-        try:
+-            self.df = pd.read_csv(dataset_path)
+-            self.df = self.df.drop_duplicates(subset=["track_name", "artists"]).reset_index(drop=True)
+-            features = self.df[FEATURE_COLUMNS].apply(pd.to_numeric, errors="coerce").fillna(0)
+-            scaler = MinMaxScaler()
+-            self.scaled = pd.DataFrame(scaler.fit_transform(features), columns=FEATURE_COLUMNS, index=self.df.index)
+-            self.available = True
+-            logger.info(f"MusicEngine loaded {len(self.df)} tracks")
+-        except Exception as e:
+-            logger.warning(f"MusicEngine dataset not loaded: {e}")
+-            self.df = pd.DataFrame(columns=["track_name", "artists", "track_genre"])
+-            self.scaled = pd.DataFrame(columns=FEATURE_COLUMNS)
+-
+-    def search_track(self, track_name: str, artist: Optional[str] = None) -> Optional[dict]:
+-        if not self.available or not track_name:
+-            return None
+-        mask = self.df["track_name"].str.contains(track_name, case=False, na=False, regex=False)
+-        if artist:
+-            mask &= self.df["artists"].str.lower() == artist.lower()
+-        matches = self.df[mask]
+-        if matches.empty:
+-            return None
+-        best = matches.sort_values("popularity", ascending=False).iloc[0]
+-        return {
+-            "index": int(best.name),
+-            "track_name": str(best["track_name"]),
+-            "artist": str(best["artists"]),
+-            "genre": str(best["track_genre"]),
+-        }
+-
+-    def get_track_vector(self, index: int) -> Optional[List[float]]:
+-        if not self.available or index not in self.scaled.index:
+-            return None
+-        return self.scaled.loc[index].tolist()
+-
+-    def build_taste_vector(self, indices: List[int]) -> Optional[List[float]]:
+-        vectors = [self.get_track_vector(i) for i in indices]
+-        vectors = [v for v in vectors if v is not None]
+-        if not vectors:
+-            return None
+-        return np.mean(vectors, axis=0).tolist()
+-
+-    @staticmethod
+-    def similarity(vec_a: Optional[list], vec_b: Optional[list]) -> float:
+-        if not vec_a or not vec_b:
+-            return 0.0
+-        a = np.array(vec_a).reshape(1, -1)
+-        b = np.array(vec_b).reshape(1, -1)
+-        return float(cosine_similarity(a, b)[0][0])
+-
+-def resolve_tracks(names: List[str]):
+-    matched, unmatched = [], []
+-    for name in names:
+-        name = name.strip()
+-        if not name:
+-            continue
+-        result = engine.search_track(name)
+-        if result:
+-            matched.append(result)
+-        else:
+-            unmatched.append(name)
+-    return matched, unmatched
+-
+-def vector_to_json(vector: Optional[list]) -> Optional[str]:
+-    return json.dumps(vector) if vector else None
+-
+-def vector_from_json(data: Optional[str]) -> Optional[list]:
+-    return json.loads(data) if data else None
+-
+-engine = MusicEngine(config.MUSIC_DATASET_PATH)

@@ -15,8 +15,8 @@ def format_user_card(user, match_score: float = None) -> str:
         text += f"🎵 {user.genre}\n"
     if user.favorite_band:
         text += f"🎤 {user.favorite_band}\n"
-    if user.favorite_tracks:
-        text += f"🎧 {user.favorite_tracks}\n"
+    if user.favorite_songs:
+        text += f"🎧 {user.favorite_songs}\n"
     if user.bio:
         text += f"📝 {user.bio}\n"
     if match_score is not None and match_score > 0:
@@ -30,7 +30,7 @@ def format_profile(user) -> str:
     text += f"Город: {user.city or 'Не указан'}\n"
     text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
     text += f"Любимая группа: {user.favorite_band or 'Не указана'}\n"
-    text += f"Любимые песни: {user.favorite_tracks or 'Не указаны'}\n"
+    text += f"Любимые песни: {user.favorite_songs or 'Не указаны'}\n"
     text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
     text += f"Био: {user.bio or 'Не указано'}\n"
     text += f"Премиум: {'✅' if user.is_premium else '❌'}"

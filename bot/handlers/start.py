@@ -8,7 +8,6 @@ from states.registration import Registration
 from keyboards.inline import main_menu_keyboard, genre_keyboard, gender_keyboard
 from utils.helpers import validate_age
 from utils.media import save_photo
-from utils.music_engine import resolve_tracks, engine, vector_to_json
 
 router = Router()
 
@@ -48,33 +47,17 @@ async def reg_city(message: Message, state: FSMContext):
 async def reg_genre(callback: CallbackQuery, state: FSMContext):
     genre = callback.data.split("_", 1)[1]
     await state.update_data(genre=genre)
-    await state.set_state(Registration.tracks)
+    await state.set_state(Registration.songs)
     await callback.message.edit_text(
-        "Назовите 2-3 любимые песни через запятую — так мы подберём вам пару со схожим вкусом.\n"
-        "Например: Bohemian Rhapsody, Yesterday\n(или отправьте 'Пропустить')"
+        "Введите ваши любимые песни (можно несколько, через запятую).\n"
+        "Это поможет нам найти людей с похожим вкусом.\n(или отправьте 'Пропустить')"
     )
     await callback.answer()
 
-@router.message(Registration.tracks)
-async def reg_tracks(message: Message, state: FSMContext):
-    if message.text.lower() == "пропустить":
-        await state.update_data(taste_vector=None, favorite_tracks=None)
-        await state.set_state(Registration.band)
-        await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
-        return
-    names = message.text.split(",")
-    matched, unmatched = resolve_tracks(names)
-    if not matched:
-        await message.answer("Ни одна песня не найдена в базе. Попробуйте ещё раз или отправьте 'Пропустить'.")
-        return
-    indices = [m["index"] for m in matched]
-    vector = engine.build_taste_vector(indices)
-    tracks_display = [f"{m['track_name']} — {m['artist']}" for m in matched]
-    await state.update_data(taste_vector=vector_to_json(vector), favorite_tracks="; ".join(tracks_display))
-    reply = "Нашли: " + ", ".join(tracks_display)
-    if unmatched:
-        reply += "\nНе нашли: " + ", ".join(unmatched)
-    await message.answer(reply)
+@router.message(Registration.songs)
+async def reg_songs(message: Message, state: FSMContext):
+    songs = None if message.text.lower() == "пропустить" else message.text
+    await state.update_data(favorite_songs=songs)
     await state.set_state(Registration.band)
     await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
 
@@ -120,8 +103,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         city=data.get("city"),
         genre=data.get("genre"),
         favorite_band=data.get("favorite_band"),
-        favorite_tracks=data.get("favorite_tracks"),
-        taste_vector=data.get("taste_vector"),
+        favorite_songs=data.get("favorite_songs"),
         preferred_gender=data.get("preferred_gender"),
         bio=data.get("bio"),
         photo_file_id=photo_file_id,

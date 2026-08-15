@@ -8,7 +8,7 @@ from database import crud
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard, main_menu_keyboard
 from states.browse import Browse
 from utils.helpers import format_user_card
-from utils.matching import pick_candidate
+from utils.matching import pick_candidate_simple
 
 router = Router()
 

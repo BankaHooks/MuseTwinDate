@@ -13,15 +13,15 @@ def main_menu_keyboard():
 
 def profile_view_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="Имя", callback_data="edit_name"),
-         InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
-        [InlineKeyboardButton(text="Город", callback_data="edit_city"),
-         InlineKeyboardButton(text="Жанр", callback_data="edit_genre")],
-        [InlineKeyboardButton(text="Группа", callback_data="edit_band"),
-         InlineKeyboardButton(text="Пол партнера", callback_data="edit_gender")],
-        [InlineKeyboardButton(text="Треки", callback_data="edit_tracks"),
-         InlineKeyboardButton(text="Био", callback_data="edit_bio")],
-        [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="✏️ Имя", callback_data="edit_name"),
+         InlineKeyboardButton(text="✏️ Возраст", callback_data="edit_age")],
+        [InlineKeyboardButton(text="✏️ Город", callback_data="edit_city"),
+         InlineKeyboardButton(text="✏️ Жанр", callback_data="edit_genre")],
+        [InlineKeyboardButton(text="✏️ Группа", callback_data="edit_band"),
+         InlineKeyboardButton(text="✏️ Пол партнера", callback_data="edit_gender")],
+        [InlineKeyboardButton(text="✏️ Песни", callback_data="edit_songs"),
+         InlineKeyboardButton(text="✏️ Био", callback_data="edit_bio")],
+        [InlineKeyboardButton(text="🖼️ Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -33,11 +33,7 @@ def genre_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def gender_keyboard():
-    genders = [
-        ("Мужской", "male"),
-        ("Женский", "female"),
-        ("Любой", "any")
-    ]
+    genders = [("Мужской", "male"), ("Женский", "female"), ("Любой", "any")]
     buttons = [[InlineKeyboardButton(text=label, callback_data=f"gender_{value}")] for label, value in genders]
     buttons.append([InlineKeyboardButton(text="🔙 Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -68,12 +64,7 @@ def likes_action_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def report_reason_keyboard():
-    reasons = [
-        ("Спам", "spam"),
-        ("Неприемлемый контент", "inappropriate"),
-        ("Фейковый профиль", "fake"),
-        ("Другое", "other"),
-    ]
+    reasons = [("Спам", "spam"), ("Неприемлемый контент", "inappropriate"), ("Фейковый профиль", "fake"), ("Другое", "other")]
     buttons = [[InlineKeyboardButton(text=label, callback_data=f"reportreason_{value}")] for label, value in reasons]
     buttons.append([InlineKeyboardButton(text="🔙 Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

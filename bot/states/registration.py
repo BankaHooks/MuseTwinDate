@@ -5,7 +5,7 @@ class Registration(StatesGroup):
     age = State()
     city = State()
     genre = State()
-    tracks = State()
+    songs = State()
     band = State()
     preferred_gender = State()
     bio = State()
