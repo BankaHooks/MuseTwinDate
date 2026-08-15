@@ -2,14 +2,14 @@ import random
 from datetime import datetime, timedelta
 
 SECURITY_TIPS = [
-    "⚠️ Никогда не переводите деньги незнакомым людям.",
-    "🔒 Не делитесь личными данными (адрес, паспорт, телефон).",
-    "📸 Если просят фото с паспортом — мошенники.",
-    "💬 Не переходите по подозрительным ссылкам.",
-    "🚫 Если собеседник просит деньги — заблокируйте.",
-    "🔐 Не передавайте доступ к вашему Telegram.",
-    "📞 Не подтверждайте номера по SMS от незнакомцев.",
-    "🛡️ Включите двухфакторную аутентификацию в Telegram.",
+    "Никогда не переводите деньги незнакомым людям.",
+    "Не делитесь личными данными (адрес, паспорт, телефон).",
+    "Если просят фото с паспортом — мошенники.",
+    "Не переходите по подозрительным ссылкам.",
+    "Если собеседник просит деньги — заблокируйте.",
+    "Не передавайте доступ к вашему Telegram.",
+    "Не подтверждайте номера по SMS от незнакомцев.",
+    "Включите двухфакторную аутентификацию в Telegram.",
 ]
 
 CITY_SYNONYMS = {
@@ -58,14 +58,21 @@ CITY_SYNONYMS = {
     "судак": ["судак", "sudak"],
 }
 
-def validate_age(age_str: str) -> bool:
+GOAL_TRANSLATE = {
+    "flirt": "Флирт",
+    "communication": "Общение",
+    "friendship": "Дружба",
+    "relationship": "Отношения"
+}
+
+def validate_age(age_str):
     try:
         age = int(age_str)
         return 18 <= age <= 99
     except ValueError:
         return False
 
-def normalize_city(city: str) -> str:
+def normalize_city(city):
     if not city:
         return city
     city_lower = city.lower().strip()
@@ -74,44 +81,63 @@ def normalize_city(city: str) -> str:
             return canonical
     return city_lower.capitalize()
 
-def format_user_card(user, match_score: float = None) -> str:
-    text = f"👤 {user.name or 'No name'}\n"
-    if user.gender:
-        text += f"⚥ {user.gender}\n"
+def format_user_card(user, match_score=None):
+    name_line = user.name or "Без имени"
+    if user.is_premium:
+        name_line += " ⭐"
+    text = name_line + "\n"
     if user.age:
-        text += f"🎂 {user.age} years old\n"
+        text += f"Возраст: {user.age}\n"
     if user.city:
-        text += f"📍 {user.city}\n"
+        text += f"Город: {user.city}\n"
+    text += "---\n"
     if user.favorite_genres:
-        text += f"🎵 Жанры: {user.favorite_genres}\n"
+        text += f"Жанры: {user.favorite_genres}\n"
     if user.favorite_bands:
-        text += f"🎤 Группы: {user.favorite_bands}\n"
+        text += f"Группы: {user.favorite_bands}\n"
     if user.favorite_songs:
-        text += f"🎧 Песни: {user.favorite_songs}\n"
+        text += f"Песни: {user.favorite_songs}\n"
+    text += "---\n"
     if user.search_goal:
-        text += f"🎯 Цель: {user.search_goal}\n"
+        goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
+        text += f"Цель: {goal_ru}\n"
+    text += "---\n"
     if user.interests:
-        text += f"🌟 Интересы: {user.interests}\n"
+        text += f"Интересы: {user.interests}\n"
+    text += "---\n"
     if user.bio:
-        text += f"📝 {user.bio}\n"
-    if match_score is not None and match_score > 0:
-        text += f"🎯 Совпадение вкуса: {round(match_score * 100)}%\n"
+        text += f"{user.bio}\n"
+    if match_score and match_score > 0:
+        text += f"Совпадение вкуса: {round(match_score * 100)}%\n"
     return text
 
-def format_profile(user) -> str:
-    text = "👤 Ваш профиль:\n\n"
-    text += f"Имя: {user.name or 'Не указано'}\n"
-    text += f"Пол: {user.gender or 'Не указан'}\n"
-    text += f"Возраст: {user.age or 'Не указан'}\n"
-    text += f"Город: {user.city or 'Не указан'}\n"
-    text += f"Любимые жанры: {user.favorite_genres or 'Не указаны'}\n"
-    text += f"Любимые группы: {user.favorite_bands or 'Не указаны'}\n"
-    text += f"Любимые песни: {user.favorite_songs or 'Не указаны'}\n"
-    text += f"Цель знакомства: {user.search_goal or 'Не указана'}\n"
-    text += f"Интересы: {user.interests or 'Не указаны'}\n"
-    text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
-    text += f"Био: {user.bio or 'Не указано'}\n"
-    text += f"Премиум: {'✅' if user.is_premium else '❌'}"
+def format_profile(user):
+    name_line = user.name or "Без имени"
+    if user.is_premium:
+        name_line += " ⭐"
+    text = "Ваш профиль:\n\n"
+    text += f"Имя: {name_line}\n"
+    if user.age:
+        text += f"Возраст: {user.age}\n"
+    if user.city:
+        text += f"Город: {user.city}\n"
+    text += "---\n"
+    if user.favorite_genres:
+        text += f"Любимые жанры: {user.favorite_genres}\n"
+    if user.favorite_bands:
+        text += f"Любимые группы: {user.favorite_bands}\n"
+    if user.favorite_songs:
+        text += f"Любимые песни: {user.favorite_songs}\n"
+    text += "---\n"
+    if user.search_goal:
+        goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
+        text += f"Цель знакомства: {goal_ru}\n"
+    text += "---\n"
+    if user.interests:
+        text += f"Интересы: {user.interests}\n"
+    text += "---\n"
+    if user.bio:
+        text += f"Био: {user.bio}\n"
     return text
 
 async def send_security_notice_if_needed(message, user, session):
