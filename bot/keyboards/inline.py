@@ -14,17 +14,31 @@ def profile_view_keyboard(user):
     city_toggle_text = "Искать в моём городе" if user.search_city_only else "Искать везде"
     buttons = [
         [InlineKeyboardButton(text="Имя", callback_data="edit_name"),
-         InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
-        [InlineKeyboardButton(text="Город", callback_data="edit_city"),
-         InlineKeyboardButton(text="Жанр", callback_data="edit_genre")],
-        [InlineKeyboardButton(text="Группа", callback_data="edit_band"),
-         InlineKeyboardButton(text="Пол партнера", callback_data="edit_gender")],
+         InlineKeyboardButton(text="Свой пол", callback_data="edit_gender")],
+        [InlineKeyboardButton(text="Возраст", callback_data="edit_age"),
+         InlineKeyboardButton(text="Город", callback_data="edit_city")],
+        [InlineKeyboardButton(text="Жанр", callback_data="edit_genre"),
+         InlineKeyboardButton(text="Группа", callback_data="edit_band")],
         [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
          InlineKeyboardButton(text="Био", callback_data="edit_bio")],
         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="Пол партнера", callback_data="edit_preferred_gender")],
         [InlineKeyboardButton(text=city_toggle_text, callback_data="toggle_city")],
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def gender_choose_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="Мужской", callback_data="gender_male")],
+        [InlineKeyboardButton(text="Женский", callback_data="gender_female")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def preferred_gender_keyboard():
+    genders = [("Мужской", "male"), ("Женский", "female"), ("Любой", "any")]
+    buttons = [[InlineKeyboardButton(text=label, callback_data=f"pref_gender_{value}")] for label, value in genders]
+    buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def genre_keyboard():

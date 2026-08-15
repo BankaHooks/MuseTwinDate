@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from states.registration import Registration
-from keyboards.inline import genre_keyboard, gender_keyboard
+from keyboards.inline import genre_keyboard, gender_keyboard, gender_choose_keyboard, preferred_gender_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age
 from utils.media import save_photo
@@ -26,8 +26,16 @@ async def start_command(message: Message, state: FSMContext, session: AsyncSessi
 async def reg_name(message: Message, state: FSMContext):
     name = None if message.text.lower() == "пропустить" else message.text
     await state.update_data(name=name)
+    await state.set_state(Registration.gender)
+    await message.answer("Укажите ваш пол:", reply_markup=gender_choose_keyboard())
+
+@router.callback_query(StateFilter(Registration.gender), F.data.startswith("gender_"))
+async def reg_gender(callback: CallbackQuery, state: FSMContext):
+    gender = callback.data.split("_")[1]
+    await state.update_data(gender=gender)
     await state.set_state(Registration.age)
-    await message.answer("Сколько вам лет? (18-99)")
+    await callback.message.edit_text("Сколько вам лет? (18-99)")
+    await callback.answer()
 
 @router.message(Registration.age)
 async def reg_age(message: Message, state: FSMContext):
@@ -67,11 +75,11 @@ async def reg_band(message: Message, state: FSMContext):
     band = None if message.text.lower() == "пропустить" else message.text
     await state.update_data(favorite_band=band)
     await state.set_state(Registration.preferred_gender)
-    await message.answer("Кого вы ищете? (выберите пол)", reply_markup=gender_keyboard())
+    await message.answer("Кого вы ищете? (выберите пол)", reply_markup=preferred_gender_keyboard())
 
-@router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("gender_"))
+@router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("pref_gender_"))
 async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_", 1)[1]
+    gender = callback.data.split("_")[2]
     await state.update_data(preferred_gender=gender)
     await state.set_state(Registration.bio)
     await callback.message.edit_text("Расскажите немного о себе (био):")
@@ -100,6 +108,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         telegram_id=message.from_user.id,
         username=message.from_user.username,
         name=data.get("name"),
+        gender=data.get("gender"),
         age=data.get("age"),
         city=data.get("city"),
         genre=data.get("genre"),

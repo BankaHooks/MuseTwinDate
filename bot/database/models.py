@@ -9,6 +9,7 @@ class User(Base):
     telegram_id = Column(Integer, unique=True, nullable=False)
     username = Column(String(255), nullable=True)
     name = Column(String(255), nullable=True)
+    gender = Column(String(20), nullable=True)
     age = Column(Integer, nullable=True)
     city = Column(String(255), nullable=True)
     genre = Column(String(100), nullable=True)

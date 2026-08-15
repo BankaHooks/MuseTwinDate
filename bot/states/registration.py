@@ -2,6 +2,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 class Registration(StatesGroup):
     name = State()
+    gender = State()
     age = State()
     city = State()
     genre = State()

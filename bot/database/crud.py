@@ -130,6 +130,10 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     )
     if current_user.search_city_only and current_user.city:
         stmt = stmt.where(User.city == current_user.city)
+    if current_user.preferred_gender == "male":
+        stmt = stmt.where(User.gender == "male")
+    elif current_user.preferred_gender == "female":
+        stmt = stmt.where(User.gender == "female")
     stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()

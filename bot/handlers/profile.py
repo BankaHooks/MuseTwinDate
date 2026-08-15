@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from states.profile_edit import ProfileEdit
-from keyboards.inline import profile_view_keyboard, genre_keyboard, gender_keyboard, main_menu_keyboard
+from keyboards.inline import profile_view_keyboard, genre_keyboard, gender_keyboard, gender_choose_keyboard, preferred_gender_keyboard, main_menu_keyboard
 from utils.helpers import validate_age, format_profile
 from utils.media import save_photo
 
@@ -63,7 +63,10 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Выберите жанр:", reply_markup=genre_keyboard())
     elif field == "gender":
         await state.set_state(ProfileEdit.gender)
-        await callback.message.answer("Выберите пол партнера:", reply_markup=gender_keyboard())
+        await callback.message.answer("Выберите ваш пол:", reply_markup=gender_choose_keyboard())
+    elif field == "preferred_gender":
+        await state.set_state(ProfileEdit.preferred_gender)
+        await callback.message.answer("Кого вы ищете?", reply_markup=preferred_gender_keyboard())
     elif field in EDIT_PROMPTS:
         await state.set_state(getattr(ProfileEdit, field))
         await callback.message.answer(EDIT_PROMPTS[field])
@@ -76,6 +79,15 @@ async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
     await crud.update_user(session, user, name=name)
     await state.clear()
     await message.answer("Имя обновлено", reply_markup=main_menu_keyboard())
+
+@router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
+async def process_edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    gender = callback.data.split("_")[1]
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    await crud.update_user(session, user, gender=gender)
+    await state.clear()
+    await callback.message.edit_text("Пол обновлён", reply_markup=main_menu_keyboard())
+    await callback.answer()
 
 @router.message(ProfileEdit.age)
 async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
@@ -119,13 +131,13 @@ async def edit_band(message: Message, state: FSMContext, session: AsyncSession):
     await state.clear()
     await message.answer("Группа обновлена", reply_markup=main_menu_keyboard())
 
-@router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
-async def edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_", 1)[1]
+@router.callback_query(StateFilter(ProfileEdit.preferred_gender), F.data.startswith("pref_gender_"))
+async def process_edit_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    gender = callback.data.split("_")[2]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, preferred_gender=gender)
     await state.clear()
-    await callback.message.edit_text("Пол партнера обновлён", reply_markup=main_menu_keyboard())
+    await callback.message.edit_text("Предпочтения обновлены", reply_markup=main_menu_keyboard())
     await callback.answer()
 
 @router.message(ProfileEdit.bio)

@@ -21,6 +21,8 @@ def validate_age(age_str: str) -> bool:
 
 def format_user_card(user, match_score: float = None) -> str:
     text = f"👤 {user.name or 'No name'}\n"
+    if user.gender:
+        text += f"⚥ {user.gender}\n"
     if user.age:
         text += f"🎂 {user.age} years old\n"
     if user.city:
@@ -40,6 +42,7 @@ def format_user_card(user, match_score: float = None) -> str:
 def format_profile(user) -> str:
     text = "👤 Ваш профиль:\n\n"
     text += f"Имя: {user.name or 'Не указано'}\n"
+    text += f"Пол: {user.gender or 'Не указан'}\n"
     text += f"Возраст: {user.age or 'Не указан'}\n"
     text += f"Город: {user.city or 'Не указан'}\n"
     text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
