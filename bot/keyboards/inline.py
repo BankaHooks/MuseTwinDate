@@ -10,6 +10,12 @@ INTEREST_CATEGORIES = {
     "Разное": ["DIY", "Комнатные растения", "Осознанность", "Медитация", "Ретро-техника", "Карты и география"]
 }
 
+def _clean(text):
+    return text.replace(" ", "_")
+
+def _restore(text):
+    return text.replace("_", " ")
+
 def main_menu_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Поиск", callback_data="browse")],
@@ -68,7 +74,7 @@ def goal_keyboard():
 def interest_category_keyboard():
     buttons = []
     for category in INTEREST_CATEGORIES.keys():
-        buttons.append([InlineKeyboardButton(text=category, callback_data=f"cat_{category}")])
+        buttons.append([InlineKeyboardButton(text=category, callback_data=f"cat_{_clean(category)}")])
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="interests_done")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -77,7 +83,8 @@ def interest_items_keyboard(category, selected):
     buttons = []
     for topic in topics:
         check = "✅ " if topic in selected else ""
-        buttons.append([InlineKeyboardButton(text=f"{check}{topic}", callback_data=f"interest_{topic}")])
+        clean_topic = _clean(topic)
+        buttons.append([InlineKeyboardButton(text=f"{check}{topic}", callback_data=f"interest_{clean_topic}")])
     buttons.append([InlineKeyboardButton(text="Назад к категориям", callback_data="interests_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

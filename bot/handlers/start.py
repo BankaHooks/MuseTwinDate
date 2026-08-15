@@ -15,6 +15,9 @@ from utils.media import save_photo
 
 router = Router()
 
+def _restore(text):
+    return text.replace("_", " ")
+
 @router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
@@ -109,7 +112,7 @@ async def reg_goal(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.interests), F.data.startswith("cat_"))
 async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1]
+    category = _restore(callback.data.split("_", 1)[1])
     data = await state.get_data()
     selected = data.get("interests_list", [])
     await state.update_data(current_category=category)
@@ -118,7 +121,7 @@ async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.interests), F.data.startswith("interest_"))
 async def reg_toggle_interest(callback: CallbackQuery, state: FSMContext):
-    topic = callback.data.split("_", 1)[1]
+    topic = _restore(callback.data.split("_", 1)[1])
     data = await state.get_data()
     selected = data.get("interests_list", [])
     if topic in selected:

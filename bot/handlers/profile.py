@@ -16,6 +16,9 @@ from utils.media import save_photo
 
 router = Router()
 
+def _restore(text):
+    return text.replace("_", " ")
+
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
     await show_profile(callback.message, callback.from_user.id, session, delete_old=True)
@@ -155,7 +158,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
 
 @router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("cat_"))
 async def edit_show_interests(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1]
+    category = _restore(callback.data.split("_", 1)[1])
     data = await state.get_data()
     selected = data.get("interests_list", [])
     await state.update_data(current_category=category)
@@ -164,7 +167,7 @@ async def edit_show_interests(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("interest_"))
 async def edit_toggle_interest(callback: CallbackQuery, state: FSMContext):
-    topic = callback.data.split("_", 1)[1]
+    topic = _restore(callback.data.split("_", 1)[1])
     data = await state.get_data()
     selected = data.get("interests_list", [])
     if topic in selected:
