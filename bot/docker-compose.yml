@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  bot:
+    build: .
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/muse_db
+      - REDIS_URL=redis://redis:6379/0
+      - PAYMENT_PROVIDER_TOKEN=${PAYMENT_PROVIDER_TOKEN}
+      - ADMIN_IDS=${ADMIN_IDS}
+      - USE_WEBHOOK=False
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: muse_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+volumes:
+  pg_data:
