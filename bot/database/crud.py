@@ -130,10 +130,6 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     )
     if current_user.search_city_only and current_user.city:
         stmt = stmt.where(User.city == current_user.city)
-    if current_user.preferred_gender == "male":
-        stmt = stmt.where(User.gender == "male")
-    elif current_user.preferred_gender == "female":
-        stmt = stmt.where(User.gender == "female")
     stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()
@@ -153,4 +149,18 @@ async def increment_likes(session: AsyncSession, user: User):
     if user.last_like_date is None or user.last_like_date.date() < datetime.utcnow().date():
         user.likes_today = 1
         user.last_like_date = datetime.utcnow()
+    await session.commit()
+
+from sqlalchemy import func
+
+async def get_likes_count(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
+    return result.scalar() or 0
+
+async def update_like_notification_count(session: AsyncSession, user: User, count: int):
+    user.last_like_notification_count = count
+    await session.commit()
+
+async def update_last_activity(session: AsyncSession, user: User):
+    user.last_activity = datetime.utcnow()
     await session.commit()

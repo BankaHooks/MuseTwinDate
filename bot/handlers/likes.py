@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
+from database.crud import get_likes_count
 from keyboards.inline import likes_action_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import format_user_card
@@ -68,6 +69,19 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Пользователь не найден.")
         return
     like = await crud.create_like(session, user.id, target.id)
+    # Уведомление о количестве лайков для цели
+    total_likes = await get_likes_count(session, target.id)
+    if total_likes > target.last_like_notification_count:
+        count = total_likes
+        if count == 1:
+            text = "Вас лайкнул 1 человек."
+        elif count in (2, 3, 4):
+            text = f"Вас лайкнули {count} человека."
+        else:
+            text = f"Вас лайкнули {count} человек."
+        await callback.bot.send_message(target.telegram_id, text)
+        target.last_like_notification_count = count
+        await session.commit()
     if like.is_mutual:
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"

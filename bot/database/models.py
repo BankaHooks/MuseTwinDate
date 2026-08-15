@@ -28,6 +28,9 @@ class User(Base):
     likes_today = Column(Integer, default=0)
     last_like_date = Column(DateTime, nullable=True)
     search_city_only = Column(Boolean, default=False)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    last_like_notification_count = Column(Integer, default=0)
+    last_inactivity_notification = Column(DateTime, nullable=True)
 
     sent_likes = relationship("Like", foreign_keys="Like.from_user_id", back_populates="from_user")
     received_likes = relationship("Like", foreign_keys="Like.to_user_id", back_populates="to_user")

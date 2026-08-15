@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
+from database.crud import get_likes_count
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
@@ -64,6 +65,21 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         return
     like = await crud.create_like(session, user.id, candidate.id)
     await crud.increment_likes(session, user)
+
+    # Уведомление о количестве лайков для цели
+    total_likes = await get_likes_count(session, candidate.id)
+    if total_likes > candidate.last_like_notification_count:
+        count = total_likes
+        if count == 1:
+            text = "Вас лайкнул 1 человек."
+        elif count in (2, 3, 4):
+            text = f"Вас лайкнули {count} человека."
+        else:
+            text = f"Вас лайкнули {count} человек."
+        await callback.bot.send_message(candidate.telegram_id, text)
+        candidate.last_like_notification_count = count
+        await session.commit()
+
     if like.is_mutual:
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
@@ -101,7 +117,6 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
         await callback.answer("Нет анкеты.")
         return
     await state.update_data(report_target=candidate_id)
-    # Проверяем, есть ли фото в сообщении
     if callback.message.photo:
         await callback.message.edit_caption(
             caption="Выберите причину жалобы:",
