@@ -1,80 +1,91 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InputMediaPhoto
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
+from keyboards.inline import likes_action_keyboard, main_menu_keyboard
+from utils.helpers import format_user_card
 
 router = Router()
-PAGE_SIZE = 5
+
+from aiogram.fsm.state import State, StatesGroup
+
+class LikesState(StatesGroup):
+    current_index = State()
+    likes_list = State()  
 
 @router.callback_query(F.data == "likes")
-async def likes_start(callback: CallbackQuery, session: AsyncSession):
+async def likes_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
-        await callback.answer("Register first.")
+        await callback.answer("Зарегистрируйтесь через /start")
         return
     likes = await crud.get_likes_received(session, user.id)
     if not likes:
-        await callback.message.edit_text("No likes yet.")
+        await callback.message.edit_text("Вас пока никто не лайкнул.")
         await callback.answer()
         return
-    # Store in state or just paginate using callback data
-    await show_likes_page(callback, session, user.id, 0, likes)
+    like_ids = [like.from_user_id for like in likes]
+    await state.update_data(likes_list=like_ids, current_index=0)
+    await show_like(callback, state, session)
 
-async def show_likes_page(callback: CallbackQuery, session: AsyncSession, user_id: int, page: int, all_likes=None):
-    if all_likes is None:
-        likes = await crud.get_likes_received(session, user_id)
-    else:
-        likes = all_likes
-    total = len(likes)
-    start = page * PAGE_SIZE
-    end = min(start + PAGE_SIZE, total)
-    if start >= total:
-        await callback.answer("No more likes.")
+async def show_like(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    like_ids = data.get("likes_list", [])
+    idx = data.get("current_index", 0)
+    if idx >= len(like_ids):
+        await callback.message.edit_text("Вы просмотрели все лайки.")
+        await callback.message.answer("Главное меню:", reply_markup=main_menu_keyboard())
+        await state.clear()
+        await callback.answer()
         return
-    page_likes = likes[start:end]
-    text = "❤️ Your likes:\n\n"
-    buttons = []
-    for like in page_likes:
-        from_user = like.from_user
-        mutual = like.is_mutual
-        line = f"👤 {from_user.name or from_user.username}, {from_user.age or '?'}, {from_user.city or ''}"
-        if mutual:
-            line += " ✅ mutual"
-            btn = InlineKeyboardButton(text="💬 Chat", callback_data=f"chat_{from_user.id}")
-        else:
-            btn = InlineKeyboardButton(text="❤️ Like Back", callback_data=f"likeback_{from_user.id}")
-        text += line + "\n"
-        buttons.append([btn])
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton(text="⬅️ Prev", callback_data=f"likes_page_{page-1}"))
-    if end < total:
-        nav.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"likes_page_{page+1}"))
-    if nav:
-        buttons.append(nav)
-    buttons.append([InlineKeyboardButton(text="🔙 Back", callback_data="main_menu")])
-    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await callback.message.edit_text(text, reply_markup=markup)
+    user_id = like_ids[idx]
+    liker = await crud.get_user_by_id(session, user_id)
+    if not liker:
+        # если пользователь удалён, пропускаем
+        await state.update_data(current_index=idx+1)
+        await show_like(callback, state, session)
+        return
+    is_mutual = await crud.get_like_between(session, callback.from_user.id, liker.id)
+    mutual = is_mutual is not None and is_mutual.is_mutual
+    text = format_user_card(liker)
+    if mutual:
+        text += "\n✅ Взаимный лайк!"
+    if liker.photo_file_id:
+        await callback.message.edit_media(
+            InputMediaPhoto(media=liker.photo_file_id, caption=text),
+            reply_markup=likes_action_keyboard(liker.id)
+        )
+    else:
+        await callback.message.edit_text(text, reply_markup=likes_action_keyboard(liker.id))
     await callback.answer()
 
-@router.callback_query(F.data.startswith("likes_page_"))
-async def likes_page_callback(callback: CallbackQuery, session: AsyncSession):
-    page = int(callback.data.split("_")[2])
-    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    likes = await crud.get_likes_received(session, user.id)
-    await show_likes_page(callback, session, user.id, page, likes)
-
 @router.callback_query(F.data.startswith("likeback_"))
-async def like_back_callback(callback: CallbackQuery, session: AsyncSession):
+async def like_back_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     target_id = int(callback.data.split("_")[1])
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     like = await crud.create_like(session, user.id, target_id)
     if like.is_mutual:
         target = await crud.get_user_by_id(session, target_id)
         await callback.bot.send_message(target.telegram_id,
-            f"🎉 Mutual! You and {user.name or user.username} liked each other.")
-        await callback.answer("It's a match! 🎉")
+            f"🎉 Взаимность! Вы и {user.name or user.username} понравились друг другу.")
+        await callback.answer("Это взаимно! 🎉")
     else:
-        await callback.answer("Liked back!")
-    # refresh likes list
-    await likes_start(callback, session)
+        await callback.answer("Вы лайкнули в ответ!")
+    data = await state.get_data()
+    idx = data.get("current_index", 0)
+    await state.update_data(current_index=idx+1)
+    await show_like(callback, state, session)
+
+@router.callback_query(F.data.startswith("skip_like_"))
+async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    idx = data.get("current_index", 0)
+    await state.update_data(current_index=idx+1)
+    await show_like(callback, state, session)
+
+@router.callback_query(F.data == "likes_back")
+async def likes_back(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text("Главное меню:", reply_markup=main_menu_keyboard())
+    await callback.answer()

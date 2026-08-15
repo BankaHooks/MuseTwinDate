@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -12,6 +12,8 @@ class User(Base):
     age = Column(Integer, nullable=True)
     city = Column(String(255), nullable=True)
     genre = Column(String(100), nullable=True)
+    favorite_band = Column(String(255), nullable=True)
+    preferred_gender = Column(String(50), nullable=True)
     bio = Column(Text, nullable=True)
     photo_file_id = Column(String(255), nullable=True)
     photo_local_path = Column(String(255), nullable=True)
@@ -20,6 +22,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     is_banned = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
     sent_likes = relationship("Like", foreign_keys="Like.from_user_id", back_populates="from_user")
     received_likes = relationship("Like", foreign_keys="Like.to_user_id", back_populates="to_user")
     skips = relationship("Skip", foreign_keys="Skip.user_id", back_populates="user")

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
 from aiogram import BaseMiddleware
 from typing import Callable, Dict, Any, Awaitable
@@ -26,7 +27,7 @@ class DBSessionMiddleware(BaseMiddleware):
 async def on_startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created (if not exist).")
+    logger.info("Database tables created")
 
 async def main():
     storage = MemoryStorage()
@@ -39,10 +40,7 @@ async def main():
             logger.info("Using Redis storage")
         except Exception as e:
             logger.warning(f"Redis init failed: {e}, using MemoryStorage")
-    
-    # Создаём бота, передавая таймаут напрямую (без DefaultBotProperties)
     bot = Bot(token=config.BOT_TOKEN, request_timeout=60)
-    
     dp = Dispatcher(storage=storage)
     dp.update.middleware(DBSessionMiddleware())
     dp.include_routers(

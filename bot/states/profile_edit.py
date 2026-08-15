@@ -5,5 +5,7 @@ class ProfileEdit(StatesGroup):
     age = State()
     city = State()
     genre = State()
+    band = State()
+    gender = State()
     bio = State()
     photo = State()
