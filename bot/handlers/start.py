@@ -7,7 +7,7 @@ from database import crud
 from states.registration import Registration
 from keyboards.inline import genre_keyboard, gender_keyboard, gender_choose_keyboard, preferred_gender_keyboard
 from keyboards.reply import main_reply_keyboard
-from utils.helpers import validate_age
+from utils.helpers import validate_age, normalize_city
 from utils.media import save_photo
 
 router = Router()
@@ -48,7 +48,8 @@ async def reg_age(message: Message, state: FSMContext):
 
 @router.message(Registration.city)
 async def reg_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
+    city = normalize_city(message.text)
+    await state.update_data(city=city)
     await state.set_state(Registration.genre)
     await message.answer("Ваш любимый музыкальный жанр?", reply_markup=genre_keyboard())
 

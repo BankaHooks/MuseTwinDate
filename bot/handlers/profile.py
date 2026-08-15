@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from states.profile_edit import ProfileEdit
 from keyboards.inline import profile_view_keyboard, genre_keyboard, gender_keyboard, gender_choose_keyboard, preferred_gender_keyboard, main_menu_keyboard
-from utils.helpers import validate_age, format_profile
+from utils.helpers import validate_age, format_profile, normalize_city
 from utils.media import save_photo
 
 router = Router()
@@ -101,8 +101,9 @@ async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
 
 @router.message(ProfileEdit.city)
 async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
+    city = normalize_city(message.text)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    await crud.update_user(session, user, city=message.text)
+    await crud.update_user(session, user, city=city)
     await state.clear()
     await message.answer("Город обновлён", reply_markup=main_menu_keyboard())
 
