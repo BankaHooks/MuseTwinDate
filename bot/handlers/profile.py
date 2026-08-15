@@ -4,11 +4,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
+from states.registration import Registration
 from states.profile_edit import ProfileEdit
 from keyboards.inline import (
     profile_view_keyboard, genre_choose_keyboard, gender_choose_keyboard,
-    preferred_gender_keyboard, goal_keyboard, interest_category_keyboard,
-    interest_items_keyboard
+    preferred_gender_keyboard, goal_keyboard, interest_category_keyboard, interest_items_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
@@ -36,6 +36,25 @@ async def show_profile(target: Message, user_id: int, session: AsyncSession, del
 
 async def show_profile_for_message(message: Message, session: AsyncSession):
     await show_profile(message, message.from_user.id, session, delete_old=False)
+
+@router.callback_query(F.data == "reset_profile")
+async def reset_profile(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+    await state.update_data(user_id=user.id)
+    fields = [
+        "name", "gender", "age", "city", "favorite_genres", "favorite_bands",
+        "favorite_songs", "search_goal", "interests", "preferred_gender", "bio", "photo_file_id"
+    ]
+    for field in fields:
+        setattr(user, field, None)
+    await session.commit()
+    await state.set_state(Registration.name)
+    await callback.message.delete()
+    await callback.message.answer("Начнем заполнение профиля заново. Как вас зовут? (можно пропустить, отправив 'Пропустить')")
+    await callback.answer()
 
 @router.callback_query(F.data == "toggle_city")
 async def toggle_city(callback: CallbackQuery, session: AsyncSession):
@@ -87,13 +106,13 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(ProfileEdit.genres), F.data.startswith("genre_add_"))
 async def edit_add_genre(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 2)[2]
+    genre = callback.data.split("_")[2]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
         genres.append(genre)
     await state.update_data(genres=genres)
-    await callback.answer(f"Добавлен жанр: {genre}", show_alert=False)
+    await callback.answer(f"Добавлен жанр: {genre}")
 
 @router.callback_query(StateFilter(ProfileEdit.genres), F.data == "genres_done")
 async def edit_genres_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -127,7 +146,7 @@ async def edit_bands(message: Message, state: FSMContext, session: AsyncSession)
 
 @router.callback_query(StateFilter(ProfileEdit.goal), F.data.startswith("goal_"))
 async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    goal = callback.data.split("_", 1)[1]
+    goal = callback.data.split("_")[1]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, search_goal=goal)
     await state.clear()
@@ -182,7 +201,7 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
 
 @router.callback_query(StateFilter(ProfileEdit.gender), F.data.startswith("gender_"))
 async def process_edit_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_", 1)[1]
+    gender = callback.data.split("_")[1]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, gender=gender)
     await state.clear()
@@ -191,7 +210,7 @@ async def process_edit_gender(callback: CallbackQuery, state: FSMContext, sessio
 
 @router.callback_query(StateFilter(ProfileEdit.preferred_gender), F.data.startswith("pref_gender_"))
 async def process_edit_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_", 2)[2]
+    gender = callback.data.split("_")[2]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, preferred_gender=gender)
     await state.clear()

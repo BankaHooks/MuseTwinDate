@@ -34,7 +34,7 @@ async def reg_name(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.gender), F.data.startswith("gender_"))
 async def reg_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_", 1)[1]
+    gender = callback.data.split("_")[1]
     await state.update_data(gender=gender)
     await state.set_state(Registration.age)
     await callback.message.edit_text("Сколько вам лет? (18-99)")
@@ -58,13 +58,13 @@ async def reg_city(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.genres), F.data.startswith("genre_add_"))
 async def reg_add_genre(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 2)[2]
+    genre = callback.data.split("_")[2]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
         genres.append(genre)
     await state.update_data(genres=genres)
-    await callback.answer(f"Добавлен жанр: {genre}", show_alert=False)
+    await callback.answer(f"Добавлен жанр: {genre}")
 
 @router.callback_query(StateFilter(Registration.genres), F.data == "genres_done")
 async def reg_genres_done(callback: CallbackQuery, state: FSMContext):
@@ -101,7 +101,7 @@ async def reg_songs(message: Message, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.goal), F.data.startswith("goal_"))
 async def reg_goal(callback: CallbackQuery, state: FSMContext):
-    goal = callback.data.split("_", 1)[1]
+    goal = callback.data.split("_")[1]
     await state.update_data(goal=goal)
     await state.set_state(Registration.interests)
     await callback.message.edit_text("Выберите категорию интересов, затем тему. Можно выбрать до 10 тем.", reply_markup=interest_category_keyboard())
@@ -156,7 +156,7 @@ async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("pref_gender_"))
 async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_", 2)[2]
+    gender = callback.data.split("_")[2]
     await state.update_data(preferred_gender=gender)
     await state.set_state(Registration.bio)
     await callback.message.edit_text("Расскажите немного о себе (био):")
@@ -170,6 +170,8 @@ async def reg_bio(message: Message, state: FSMContext):
 
 @router.message(Registration.photo, F.content_type.in_({ContentType.PHOTO, ContentType.TEXT}))
 async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    user_id = data.get("user_id")
     photo_file_id = None
     if message.content_type == ContentType.PHOTO:
         photo = message.photo[-1]
@@ -179,26 +181,45 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         if message.text.lower() != "пропустить":
             await message.answer("Отправьте фото или 'Пропустить'")
             return
-    data = await state.get_data()
-    await crud.create_user(
-        session,
-        telegram_id=message.from_user.id,
-        username=message.from_user.username,
-        name=data.get("name"),
-        gender=data.get("gender"),
-        age=data.get("age"),
-        city=data.get("city"),
-        favorite_genres=data.get("genres"),
-        favorite_bands=data.get("bands"),
-        favorite_songs=data.get("songs"),
-        search_goal=data.get("goal"),
-        interests=data.get("interests"),
-        preferred_gender=data.get("preferred_gender"),
-        bio=data.get("bio"),
-        photo_file_id=photo_file_id,
-    )
+    if user_id:
+        user = await crud.get_user_by_id(session, user_id)
+        if user:
+            await crud.update_user(
+                session, user,
+                name=data.get("name"),
+                gender=data.get("gender"),
+                age=data.get("age"),
+                city=data.get("city"),
+                favorite_genres=data.get("genres"),
+                favorite_bands=data.get("bands"),
+                favorite_songs=data.get("songs"),
+                search_goal=data.get("goal"),
+                interests=data.get("interests"),
+                preferred_gender=data.get("preferred_gender"),
+                bio=data.get("bio"),
+                photo_file_id=photo_file_id,
+            )
+            await message.answer("Профиль обновлён!", reply_markup=main_reply_keyboard())
+    else:
+        await crud.create_user(
+            session,
+            telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            name=data.get("name"),
+            gender=data.get("gender"),
+            age=data.get("age"),
+            city=data.get("city"),
+            favorite_genres=data.get("genres"),
+            favorite_bands=data.get("bands"),
+            favorite_songs=data.get("songs"),
+            search_goal=data.get("goal"),
+            interests=data.get("interests"),
+            preferred_gender=data.get("preferred_gender"),
+            bio=data.get("bio"),
+            photo_file_id=photo_file_id,
+        )
+        await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
     await state.clear()
-    await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
 
 @router.callback_query(F.data == "cancel")
 async def cancel_callback(callback: CallbackQuery, state: FSMContext):
