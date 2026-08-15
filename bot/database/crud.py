@@ -58,7 +58,7 @@ async def get_like_between(session: AsyncSession, user1_id: int, user2_id: int) 
             )
         )
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 async def create_skip(session: AsyncSession, user_id: int, skipped_user_id: int):
     skip = Skip(user_id=user_id, skipped_user_id=skipped_user_id)

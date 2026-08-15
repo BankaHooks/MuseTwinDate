@@ -1,8 +1,8 @@
 from aiogram import Router, F
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from database import crud
@@ -59,9 +59,11 @@ async def admin_users(callback: CallbackQuery, session: AsyncSession):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("Нет прав")
         return
-    total = await session.scalar(select(User).count())
-    active = await session.scalar(select(User).where(User.last_activity >= datetime.utcnow() - timedelta(days=7)).count())
-    premium = await session.scalar(select(User).where(User.is_premium == True).count())
+    total = await session.scalar(select(func.count()).select_from(User))
+    active = await session.scalar(
+        select(func.count()).select_from(User).where(User.last_activity >= datetime.utcnow() - timedelta(days=7))
+    )
+    premium = await session.scalar(select(func.count()).select_from(User).where(User.is_premium == True))
     text = f"Всего пользователей: {total}\nАктивных за 7 дней: {active}\nПремиум: {premium}"
     await callback.message.edit_text(text, reply_markup=admin_keyboard())
     await callback.answer()
@@ -75,7 +77,7 @@ async def admin_notify_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("Введите текст уведомления (или отправьте /cancel для отмены):")
     await callback.answer()
 
-@router.message(F.text, F.state == "admin_notify_text")
+@router.message(F.text, StateFilter("admin_notify_text"))
 async def admin_notify_text(message: Message, state: FSMContext, session: AsyncSession):
     if message.from_user.id not in ADMIN_IDS:
         await message.answer("Нет прав")
@@ -128,7 +130,7 @@ async def admin_premium_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("Введите Telegram ID пользователя (или username без @) и срок в месяцах (1, 3, 6) через пробел.\nПример: 123456789 3")
     await callback.answer()
 
-@router.message(F.text, F.state == "admin_premium_id")
+@router.message(F.text, StateFilter("admin_premium_id"))
 async def admin_premium_set(message: Message, state: FSMContext, session: AsyncSession):
     if message.from_user.id not in ADMIN_IDS:
         await message.answer("Нет прав")
