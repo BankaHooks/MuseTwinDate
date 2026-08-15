@@ -1,44 +1,46 @@
 import random
 import re
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import User
+
+def _split_keywords(text: str) -> List[str]:
+    if not text:
+        return []
+    items = re.split(r'[;,]\s*', text)
+    return [item.strip().lower() for item in items if item.strip()]
 
 async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Optional[User], float]:
     pool = await crud.get_candidate_pool(session, user.id)
     if not pool:
         return None, 0.0
 
-    user_keywords = set()
-    if user.genre:
-        user_keywords.add(user.genre.lower())
-    if user.favorite_band:
-        user_keywords.update(re.split(r'[,\s]+', user.favorite_band.lower()))
-    if user.favorite_songs:
-        user_keywords.update(re.split(r'[,\s]+', user.favorite_songs.lower()))
+    user_genres = set(_split_keywords(user.favorite_genres))
+    user_bands = set(_split_keywords(user.favorite_bands))
+    user_interests = set(_split_keywords(user.interests))
+    user_goal = user.search_goal
 
     scored = []
     for candidate in pool:
         score = 0.0
-        cand_keywords = set()
-        if candidate.genre:
-            cand_keywords.add(candidate.genre.lower())
-        if candidate.favorite_band:
-            cand_keywords.update(re.split(r'[,\s]+', candidate.favorite_band.lower()))
-        if candidate.favorite_songs:
-            cand_keywords.update(re.split(r'[,\s]+', candidate.favorite_songs.lower()))
-
-        common = user_keywords & cand_keywords
-        if common:
-            score = len(common) / max(len(user_keywords), 1)
-        # жанр – важный фактор
-        if user.genre and candidate.genre and user.genre.lower() == candidate.genre.lower():
-            score += 0.3
-        # полное совпадение группы – сильный бонус
-        if user.favorite_band and candidate.favorite_band and user.favorite_band.lower() == candidate.favorite_band.lower():
-            score += 0.5
-        # если у пользователя нет ключевых слов, то берём случайного с низким скором
+        cand_genres = set(_split_keywords(candidate.favorite_genres))
+        if user_genres and cand_genres:
+            common = user_genres & cand_genres
+            if common:
+                score += len(common) / max(len(user_genres), 1) * 0.4
+        cand_bands = set(_split_keywords(candidate.favorite_bands))
+        if user_bands and cand_bands:
+            common = user_bands & cand_bands
+            if common:
+                score += len(common) / max(len(user_bands), 1) * 0.3
+        cand_interests = set(_split_keywords(candidate.interests))
+        if user_interests and cand_interests:
+            common = user_interests & cand_interests
+            if common:
+                score += len(common) / max(len(user_interests), 1) * 0.2
+        if user_goal and candidate.search_goal and user_goal == candidate.search_goal:
+            score += 0.15
         scored.append((candidate, min(score, 1.0)))
 
     if not scored:

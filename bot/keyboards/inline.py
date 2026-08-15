@@ -17,9 +17,11 @@ def profile_view_keyboard(user):
          InlineKeyboardButton(text="Свой пол", callback_data="edit_gender")],
         [InlineKeyboardButton(text="Возраст", callback_data="edit_age"),
          InlineKeyboardButton(text="Город", callback_data="edit_city")],
-        [InlineKeyboardButton(text="Жанр", callback_data="edit_genre"),
-         InlineKeyboardButton(text="Группа", callback_data="edit_band")],
+        [InlineKeyboardButton(text="Жанры", callback_data="edit_genres"),
+         InlineKeyboardButton(text="Группы", callback_data="edit_bands")],
         [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
+         InlineKeyboardButton(text="Цель", callback_data="edit_goal")],
+        [InlineKeyboardButton(text="Интересы", callback_data="edit_interests"),
          InlineKeyboardButton(text="Био", callback_data="edit_bio")],
         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="Пол партнера", callback_data="edit_preferred_gender")],
@@ -41,16 +43,22 @@ def preferred_gender_keyboard():
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def genre_keyboard():
+def genre_choose_keyboard():
     genres = ["Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical", "Hip-Hop", "Country", "Blues", "Metal", "Other"]
-    buttons = [[InlineKeyboardButton(text=g, callback_data=f"genre_{g}")] for g in genres]
+    buttons = [[InlineKeyboardButton(text=g, callback_data=f"genre_add_{g}")] for g in genres]
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="genres_done")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def goal_keyboard():
+    goals = [("Флирт", "flirt"), ("Общение", "communication"), ("Дружба", "friendship"), ("Отношения", "relationship")]
+    buttons = [[InlineKeyboardButton(text=label, callback_data=f"goal_{value}")] for label, value in goals]
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def gender_keyboard():
-    genders = [("Мужской", "male"), ("Женский", "female"), ("Любой", "any")]
-    buttons = [[InlineKeyboardButton(text=label, callback_data=f"gender_{value}")] for label, value in genders]
-    buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
+def interest_keyboard():
+    interests = ["Программирование", "Компьютерные игры", "История", "K-pop", "Кино", "Книги", "Спорт", "Танцы", "Путешествия", "Музыка"]
+    buttons = [[InlineKeyboardButton(text=i, callback_data=f"interest_{i}")] for i in interests]
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="interests_done")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def browse_actions_keyboard():

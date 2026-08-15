@@ -19,10 +19,10 @@ CITY_SYNONYMS = {
     "екатеринбург": ["екб", "екатеринбург", "ekb", "yekaterinburg"],
     "казань": ["казань", "kazan", "кзн"],
     "новосибирск": ["новосибирск", "nsk", "новосиб"],
-    "челябинск": ["челябинск", "chel", "chel" , "Челяба"],
+    "челябинск": ["челябинск", "chel"],
     "самара": ["самара", "samara"],
     "омск": ["омск", "omsk"],
-    "ростов-на-дону": ["ростов", "ростов-на-дону", "rostov" , "рнд"],
+    "ростов-на-дону": ["ростов", "ростов-на-дону", "rostov"],
     "уфа": ["уфа", "ufa"],
     "красноярск": ["красноярск", "krasnoyarsk"],
     "пермь": ["пермь", "perm"],
@@ -58,6 +58,13 @@ CITY_SYNONYMS = {
     "судак": ["судак", "sudak"],
 }
 
+def validate_age(age_str: str) -> bool:
+    try:
+        age = int(age_str)
+        return 18 <= age <= 99
+    except ValueError:
+        return False
+
 def normalize_city(city: str) -> str:
     if not city:
         return city
@@ -67,13 +74,6 @@ def normalize_city(city: str) -> str:
             return canonical
     return city_lower.capitalize()
 
-def validate_age(age_str: str) -> bool:
-    try:
-        age = int(age_str)
-        return 18 <= age <= 99
-    except ValueError:
-        return False
-
 def format_user_card(user, match_score: float = None) -> str:
     text = f"👤 {user.name or 'No name'}\n"
     if user.gender:
@@ -82,12 +82,16 @@ def format_user_card(user, match_score: float = None) -> str:
         text += f"🎂 {user.age} years old\n"
     if user.city:
         text += f"📍 {user.city}\n"
-    if user.genre:
-        text += f"🎵 {user.genre}\n"
-    if user.favorite_band:
-        text += f"🎤 {user.favorite_band}\n"
+    if user.favorite_genres:
+        text += f"🎵 Жанры: {user.favorite_genres}\n"
+    if user.favorite_bands:
+        text += f"🎤 Группы: {user.favorite_bands}\n"
     if user.favorite_songs:
-        text += f"🎧 {user.favorite_songs}\n"
+        text += f"🎧 Песни: {user.favorite_songs}\n"
+    if user.search_goal:
+        text += f"🎯 Цель: {user.search_goal}\n"
+    if user.interests:
+        text += f"🌟 Интересы: {user.interests}\n"
     if user.bio:
         text += f"📝 {user.bio}\n"
     if match_score is not None and match_score > 0:
@@ -100,9 +104,11 @@ def format_profile(user) -> str:
     text += f"Пол: {user.gender or 'Не указан'}\n"
     text += f"Возраст: {user.age or 'Не указан'}\n"
     text += f"Город: {user.city or 'Не указан'}\n"
-    text += f"Любимый жанр: {user.genre or 'Не указан'}\n"
-    text += f"Любимая группа: {user.favorite_band or 'Не указана'}\n"
+    text += f"Любимые жанры: {user.favorite_genres or 'Не указаны'}\n"
+    text += f"Любимые группы: {user.favorite_bands or 'Не указаны'}\n"
     text += f"Любимые песни: {user.favorite_songs or 'Не указаны'}\n"
+    text += f"Цель знакомства: {user.search_goal or 'Не указана'}\n"
+    text += f"Интересы: {user.interests or 'Не указаны'}\n"
     text += f"Ищу: {user.preferred_gender or 'Не указано'}\n"
     text += f"Био: {user.bio or 'Не указано'}\n"
     text += f"Премиум: {'✅' if user.is_premium else '❌'}"

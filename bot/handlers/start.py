@@ -5,7 +5,10 @@ from aiogram.types import Message, CallbackQuery, ContentType
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from states.registration import Registration
-from keyboards.inline import genre_keyboard, gender_keyboard, gender_choose_keyboard, preferred_gender_keyboard
+from keyboards.inline import (
+    genre_choose_keyboard, gender_choose_keyboard, preferred_gender_keyboard,
+    goal_keyboard, interest_keyboard
+)
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, normalize_city
 from utils.media import save_photo
@@ -50,33 +53,81 @@ async def reg_age(message: Message, state: FSMContext):
 async def reg_city(message: Message, state: FSMContext):
     city = normalize_city(message.text)
     await state.update_data(city=city)
-    await state.set_state(Registration.genre)
-    await message.answer("Ваш любимый музыкальный жанр?", reply_markup=genre_keyboard())
+    await state.set_state(Registration.genres)
+    await message.answer("Выберите ваши любимые жанры (можно несколько):", reply_markup=genre_choose_keyboard())
 
-@router.callback_query(StateFilter(Registration.genre), F.data.startswith("genre_"))
-async def reg_genre(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 1)[1]
-    await state.update_data(genre=genre)
-    await state.set_state(Registration.songs)
-    await callback.message.edit_text(
-        "Введите ваши любимые песни (можно несколько, через запятую).\n"
-        "Это поможет нам найти людей с похожим вкусом.\n(или отправьте 'Пропустить')"
-    )
+@router.callback_query(StateFilter(Registration.genres), F.data.startswith("genre_add_"))
+async def reg_add_genre(callback: CallbackQuery, state: FSMContext):
+    genre = callback.data.split("_")[2]
+    data = await state.get_data()
+    genres = data.get("genres", [])
+    if genre not in genres:
+        genres.append(genre)
+    await state.update_data(genres=genres)
+    await callback.answer(f"Добавлен жанр: {genre}", show_alert=False)
+
+@router.callback_query(StateFilter(Registration.genres), F.data == "genres_done")
+async def reg_genres_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    genres = data.get("genres", [])
+    if not genres:
+        await callback.answer("Выберите хотя бы один жанр.", show_alert=True)
+        return
+    await state.update_data(genres=", ".join(genres))
+    await state.set_state(Registration.bands)
+    await callback.message.edit_text("Введите ваши любимые группы (до 5, разделённых запятой):\n(или 'Пропустить')")
     await callback.answer()
+
+@router.message(Registration.bands)
+async def reg_bands(message: Message, state: FSMContext):
+    bands_text = message.text.strip()
+    if bands_text.lower() == "пропустить":
+        await state.update_data(bands=None)
+    else:
+        bands = [b.strip() for b in bands_text.split(",") if b.strip()]
+        if len(bands) > 5:
+            await message.answer("Можно ввести не более 5 групп. Попробуйте снова или отправьте 'Пропустить'.")
+            return
+        await state.update_data(bands=", ".join(bands))
+    await state.set_state(Registration.songs)
+    await message.answer("Введите ваши любимые песни (можно несколько, через запятую):\n(или 'Пропустить')")
 
 @router.message(Registration.songs)
 async def reg_songs(message: Message, state: FSMContext):
     songs = None if message.text.lower() == "пропустить" else message.text
-    await state.update_data(favorite_songs=songs)
-    await state.set_state(Registration.band)
-    await message.answer("А любимая группа/исполнитель? (можно пропустить, отправив 'Пропустить')")
+    await state.update_data(songs=songs)
+    await state.set_state(Registration.goal)
+    await message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
 
-@router.message(Registration.band)
-async def reg_band(message: Message, state: FSMContext):
-    band = None if message.text.lower() == "пропустить" else message.text
-    await state.update_data(favorite_band=band)
+@router.callback_query(StateFilter(Registration.goal), F.data.startswith("goal_"))
+async def reg_goal(callback: CallbackQuery, state: FSMContext):
+    goal = callback.data.split("_")[1]
+    await state.update_data(goal=goal)
+    await state.set_state(Registration.interests)
+    await callback.message.edit_text("Выберите ваши интересы (можно несколько):", reply_markup=interest_keyboard())
+    await callback.answer()
+
+@router.callback_query(StateFilter(Registration.interests), F.data.startswith("interest_"))
+async def reg_add_interest(callback: CallbackQuery, state: FSMContext):
+    interest = callback.data.split("_")[1]
+    data = await state.get_data()
+    interests = data.get("interests", [])
+    if interest not in interests:
+        interests.append(interest)
+    await state.update_data(interests=interests)
+    await callback.answer(f"Добавлен интерес: {interest}", show_alert=False)
+
+@router.callback_query(StateFilter(Registration.interests), F.data == "interests_done")
+async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    interests = data.get("interests", [])
+    if interests:
+        await state.update_data(interests=", ".join(interests))
+    else:
+        await state.update_data(interests=None)
     await state.set_state(Registration.preferred_gender)
-    await message.answer("Кого вы ищете? (выберите пол)", reply_markup=preferred_gender_keyboard())
+    await callback.message.edit_text("Кого вы ищете? (выберите пол)", reply_markup=preferred_gender_keyboard())
+    await callback.answer()
 
 @router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("pref_gender_"))
 async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
@@ -112,9 +163,11 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
         gender=data.get("gender"),
         age=data.get("age"),
         city=data.get("city"),
-        genre=data.get("genre"),
-        favorite_band=data.get("favorite_band"),
-        favorite_songs=data.get("favorite_songs"),
+        favorite_genres=data.get("genres"),
+        favorite_bands=data.get("bands"),
+        favorite_songs=data.get("songs"),
+        search_goal=data.get("goal"),
+        interests=data.get("interests"),
         preferred_gender=data.get("preferred_gender"),
         bio=data.get("bio"),
         photo_file_id=photo_file_id,
