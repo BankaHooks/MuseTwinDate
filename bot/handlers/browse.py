@@ -36,7 +36,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 async def search_command(message: Message, state: FSMContext, session: AsyncSession):
     await show_candidate(message, state, session)
 
-@router.message(F.text == "🔍 Поиск")
+@router.message(F.text == "Поиск")
 async def search_button_handler(message: Message, state: FSMContext, session: AsyncSession):
     await search_command(message, state, session)
 
@@ -101,19 +101,26 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
         await callback.answer("Нет анкеты.")
         return
     await state.update_data(report_target=candidate_id)
-    await callback.message.edit_caption(
-        caption="Выберите причину жалобы:",
-        reply_markup=report_reason_keyboard()
-    )
+    # Проверяем, есть ли фото в сообщении
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption="Выберите причину жалобы:",
+            reply_markup=report_reason_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            text="Выберите причину жалобы:",
+            reply_markup=report_reason_keyboard()
+        )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
+@router.callback_query(F.data.startswith("reportreason_"))
 async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     reason = callback.data.split("_", 1)[1]
     data = await state.get_data()
     target_id = data.get("report_target")
     if not target_id:
-        await callback.answer("Ошибка.")
+        await callback.answer("Ошибка: цель не найдена.")
         return
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.create_report(session, user.id, target_id, reason)
