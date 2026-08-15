@@ -13,8 +13,5 @@ class Config:
     WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
     MEDIA_DIR = "media"
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    MUSIC_DATASET_PATH = os.getenv(
-        "MUSIC_DATASET_PATH",
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "spotify_dataset.csv")
-    )
+    MUSIC_DATASET_PATH = os.getenv("MUSIC_DATASET_PATH", "")
 config = Config()
