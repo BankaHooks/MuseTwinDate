@@ -151,28 +151,6 @@ async def increment_likes(session: AsyncSession, user: User):
         user.last_like_date = datetime.utcnow()
     await session.commit()
 
-from sqlalchemy import func
-
-async def get_likes_count(session: AsyncSession, user_id: int) -> int:
-    result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
-    return result.scalar() or 0
-
-async def update_like_notification_count(session: AsyncSession, user: User, count: int):
-    user.last_like_notification_count = count
-    await session.commit()
-
-async def update_last_activity(session: AsyncSession, user: User):
-    user.last_activity = datetime.utcnow()
-    await session.commit()
-
-async def create_user(session: AsyncSession, telegram_id: int, username: str = None, **kwargs) -> User:
-    user = User(telegram_id=telegram_id, username=username, **kwargs)
-    session.add(user)
-    await session.commit()
-    return user
-
-from sqlalchemy import func
-
 async def get_likes_count(session: AsyncSession, user_id: int) -> int:
     result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
     return result.scalar() or 0

@@ -14,4 +14,5 @@ class Config:
     MEDIA_DIR = "media"
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     MUSIC_DATASET_PATH = os.getenv("MUSIC_DATASET_PATH", "")
+    MINI_APP_URL = os.getenv("MINI_APP_URL", "https://bankahooks.github.io/MuseTwinDate/")
 config = Config()

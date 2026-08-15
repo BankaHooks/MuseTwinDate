@@ -1,4 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import config
 import re
 
 INTEREST_CATEGORIES = {
@@ -76,7 +77,7 @@ def main_menu_keyboard():
         [InlineKeyboardButton(text="Профиль", callback_data="profile")],
         [InlineKeyboardButton(text="Лайки", callback_data="likes")],
         [InlineKeyboardButton(text="Купить премиум", callback_data="premium")],
-        [InlineKeyboardButton(text="Mini-App", web_app={"url": "https://your-domain.com/MuseTwinDate/"})],
+        [InlineKeyboardButton(text="Mini-App", web_app={"url": config.MINI_APP_URL})],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

@@ -1,0 +1,194 @@
+diff --git a/bot/bot.py b/bot/bot.py
+index 44a0841..59e9300 100644
+--- a/bot/bot.py
++++ b/bot/bot.py
+@@ -26,6 +26,9 @@ class DBSessionMiddleware(BaseMiddleware):
+     ) -> Any:
+         async with AsyncSessionLocal() as session:
+             data["session"] = session
++            tg_user = getattr(event.event, "from_user", None)
++            if tg_user:
++                data["user"] = await crud.get_user_by_telegram_id(session, tg_user.id)
+             return await handler(event, data)
+ 
+ class ActivityMiddleware(BaseMiddleware):
+diff --git a/bot/config.py b/bot/config.py
+index e6db34b..df0f4a3 100644
+--- a/bot/config.py
++++ b/bot/config.py
+@@ -14,4 +14,5 @@ class Config:
+     MEDIA_DIR = "media"
+     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+     MUSIC_DATASET_PATH = os.getenv("MUSIC_DATASET_PATH", "")
++    MINI_APP_URL = os.getenv("MINI_APP_URL", "https://bankahooks.github.io/MuseTwinDate/")
+ config = Config()
+\ No newline at end of file
+diff --git a/bot/database/crud.py b/bot/database/crud.py
+index 011e51f..df53131 100644
+--- a/bot/database/crud.py
++++ b/bot/database/crud.py
+@@ -151,28 +151,6 @@ async def increment_likes(session: AsyncSession, user: User):
+         user.last_like_date = datetime.utcnow()
+     await session.commit()
+ 
+-from sqlalchemy import func
+-
+-async def get_likes_count(session: AsyncSession, user_id: int) -> int:
+-    result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
+-    return result.scalar() or 0
+-
+-async def update_like_notification_count(session: AsyncSession, user: User, count: int):
+-    user.last_like_notification_count = count
+-    await session.commit()
+-
+-async def update_last_activity(session: AsyncSession, user: User):
+-    user.last_activity = datetime.utcnow()
+-    await session.commit()
+-
+-async def create_user(session: AsyncSession, telegram_id: int, username: str = None, **kwargs) -> User:
+-    user = User(telegram_id=telegram_id, username=username, **kwargs)
+-    session.add(user)
+-    await session.commit()
+-    return user
+-
+-from sqlalchemy import func
+-
+ async def get_likes_count(session: AsyncSession, user_id: int) -> int:
+     result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
+     return result.scalar() or 0
+diff --git a/bot/handlers/browse.py b/bot/handlers/browse.py
+index e91d7c7..cdd3b06 100644
+--- a/bot/handlers/browse.py
++++ b/bot/handlers/browse.py
+@@ -37,10 +37,6 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
+ async def search_command(message: Message, state: FSMContext, session: AsyncSession):
+     await show_candidate(message, state, session)
+ 
+-@router.message(F.text == "Поиск")
+-async def search_button_handler(message: Message, state: FSMContext, session: AsyncSession):
+-    await search_command(message, state, session)
+-
+ @router.callback_query(F.data == "browse")
+ async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+     await callback.message.delete()
+diff --git a/bot/handlers/likes.py b/bot/handlers/likes.py
+index 38c5056..3195b02 100644
+--- a/bot/handlers/likes.py
++++ b/bot/handlers/likes.py
+@@ -27,35 +27,51 @@ async def show_likes(target: Message, user_id: int, state: FSMContext, session:
+         return
+     likes = await crud.get_likes_received(session, user.id)
+     if not likes:
++        if delete_old:
++            await target.delete()
+         await target.answer("Вас пока никто не лайкнул.", reply_markup=main_reply_keyboard())
+         return
+     like_ids = [like.from_user_id for like in likes]
+-    await state.update_data(likes_list=like_ids, current_index=0)
+-    await show_like_card(target, state, session)
++    await state.update_data(likes_list=like_ids, current_index=0, viewer_id=user.id)
++    if delete_old:
++        await target.delete()
++    await show_like_card(target, state, session, edit=False)
+ 
+-async def show_like_card(target: Message, state: FSMContext, session: AsyncSession):
++async def show_like_card(target: Message, state: FSMContext, session: AsyncSession, edit: bool = False):
+     data = await state.get_data()
+     like_ids = data.get("likes_list", [])
+     idx = data.get("current_index", 0)
++    viewer_id = data.get("viewer_id")
+     if idx >= len(like_ids):
+-        await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
++        if edit:
++            await target.delete()
++            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
++        else:
++            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+         await state.clear()
+         return
+     user_id = like_ids[idx]
+     liker = await crud.get_user_by_id(session, user_id)
+     if not liker:
+-        await state.update_data(current_index=idx+1)
+-        await show_like_card(target, state, session)
++        await state.update_data(current_index=idx + 1)
++        await show_like_card(target, state, session, edit=edit)
+         return
+-    is_mutual = await crud.get_like_between(session, target.from_user.id, liker.id)
+-    mutual = is_mutual is not None and is_mutual.is_mutual
++    like_between = await crud.get_like_between(session, viewer_id, liker.id) if viewer_id else None
++    mutual = like_between is not None and like_between.is_mutual
+     text = format_user_card(liker)
+     if mutual:
+         text += "\nВзаимный лайк!"
+-    if liker.photo_file_id:
+-        await target.answer_photo(photo=liker.photo_file_id, caption=text, reply_markup=likes_action_keyboard(liker.id))
++    markup = likes_action_keyboard(liker.id)
++    if edit:
++        if liker.photo_file_id:
++            await target.edit_media(InputMediaPhoto(media=liker.photo_file_id, caption=text), reply_markup=markup)
++        else:
++            await target.edit_text(text, reply_markup=markup)
+     else:
+-        await target.answer(text, reply_markup=likes_action_keyboard(liker.id))
++        if liker.photo_file_id:
++            await target.answer_photo(photo=liker.photo_file_id, caption=text, reply_markup=markup)
++        else:
++            await target.answer(text, reply_markup=markup)
+ 
+ async def show_likes_for_message(message: Message, state: FSMContext, session: AsyncSession):
+     await show_likes(message, message.from_user.id, state, session, delete_old=False)
+@@ -69,7 +85,6 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
+         await callback.answer("Пользователь не найден.")
+         return
+     like = await crud.create_like(session, user.id, target.id)
+-    # Уведомление о количестве лайков для цели
+     total_likes = await get_likes_count(session, target.id)
+     if total_likes > target.last_like_notification_count:
+         count = total_likes
+@@ -102,18 +117,20 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
+         await callback.answer("Вы лайкнули в ответ!")
+     data = await state.get_data()
+     idx = data.get("current_index", 0)
+-    await state.update_data(current_index=idx+1)
+-    await show_like_card(callback.message, state, session)
++    await state.update_data(current_index=idx + 1)
++    await show_like_card(callback.message, state, session, edit=True)
+ 
+ @router.callback_query(F.data.startswith("skip_like_"))
+ async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+     data = await state.get_data()
+     idx = data.get("current_index", 0)
+-    await state.update_data(current_index=idx+1)
+-    await show_like_card(callback.message, state, session)
++    await state.update_data(current_index=idx + 1)
++    await show_like_card(callback.message, state, session, edit=True)
++    await callback.answer()
+ 
+ @router.callback_query(F.data == "likes_back")
+ async def likes_back(callback: CallbackQuery, state: FSMContext):
+     await state.clear()
++    await callback.message.delete()
+     await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
+-    await callback.answer()
+\ No newline at end of file
++    await callback.answer()
+diff --git a/bot/keyboards/inline.py b/bot/keyboards/inline.py
+index 460fd69..64ab40b 100644
+--- a/bot/keyboards/inline.py
++++ b/bot/keyboards/inline.py
+@@ -1,4 +1,5 @@
+ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
++from config import config
+ import re
+ 
+ INTEREST_CATEGORIES = {
+@@ -76,7 +77,7 @@ def main_menu_keyboard():
+         [InlineKeyboardButton(text="Профиль", callback_data="profile")],
+         [InlineKeyboardButton(text="Лайки", callback_data="likes")],
+         [InlineKeyboardButton(text="Купить премиум", callback_data="premium")],
+-        [InlineKeyboardButton(text="Mini-App", web_app={"url": "https://your-domain.com/MuseTwinDate/"})],
++        [InlineKeyboardButton(text="Mini-App", web_app={"url": config.MINI_APP_URL})],
+     ]
+     return InlineKeyboardMarkup(inline_keyboard=buttons)
+ 

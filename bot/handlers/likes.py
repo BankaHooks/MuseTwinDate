@@ -27,35 +27,51 @@ async def show_likes(target: Message, user_id: int, state: FSMContext, session: 
         return
     likes = await crud.get_likes_received(session, user.id)
     if not likes:
+        if delete_old:
+            await target.delete()
         await target.answer("Вас пока никто не лайкнул.", reply_markup=main_reply_keyboard())
         return
     like_ids = [like.from_user_id for like in likes]
-    await state.update_data(likes_list=like_ids, current_index=0)
-    await show_like_card(target, state, session)
+    await state.update_data(likes_list=like_ids, current_index=0, viewer_id=user.id)
+    if delete_old:
+        await target.delete()
+    await show_like_card(target, state, session, edit=False)
 
-async def show_like_card(target: Message, state: FSMContext, session: AsyncSession):
+async def show_like_card(target: Message, state: FSMContext, session: AsyncSession, edit: bool = False):
     data = await state.get_data()
     like_ids = data.get("likes_list", [])
     idx = data.get("current_index", 0)
+    viewer_id = data.get("viewer_id")
     if idx >= len(like_ids):
-        await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+        if edit:
+            await target.delete()
+            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+        else:
+            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
         await state.clear()
         return
     user_id = like_ids[idx]
     liker = await crud.get_user_by_id(session, user_id)
     if not liker:
-        await state.update_data(current_index=idx+1)
-        await show_like_card(target, state, session)
+        await state.update_data(current_index=idx + 1)
+        await show_like_card(target, state, session, edit=edit)
         return
-    is_mutual = await crud.get_like_between(session, target.from_user.id, liker.id)
-    mutual = is_mutual is not None and is_mutual.is_mutual
+    like_between = await crud.get_like_between(session, viewer_id, liker.id) if viewer_id else None
+    mutual = like_between is not None and like_between.is_mutual
     text = format_user_card(liker)
     if mutual:
         text += "\nВзаимный лайк!"
-    if liker.photo_file_id:
-        await target.answer_photo(photo=liker.photo_file_id, caption=text, reply_markup=likes_action_keyboard(liker.id))
+    markup = likes_action_keyboard(liker.id)
+    if edit:
+        if liker.photo_file_id:
+            await target.edit_media(InputMediaPhoto(media=liker.photo_file_id, caption=text), reply_markup=markup)
+        else:
+            await target.edit_text(text, reply_markup=markup)
     else:
-        await target.answer(text, reply_markup=likes_action_keyboard(liker.id))
+        if liker.photo_file_id:
+            await target.answer_photo(photo=liker.photo_file_id, caption=text, reply_markup=markup)
+        else:
+            await target.answer(text, reply_markup=markup)
 
 async def show_likes_for_message(message: Message, state: FSMContext, session: AsyncSession):
     await show_likes(message, message.from_user.id, state, session, delete_old=False)
@@ -69,7 +85,6 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Пользователь не найден.")
         return
     like = await crud.create_like(session, user.id, target.id)
-    # Уведомление о количестве лайков для цели
     total_likes = await get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
@@ -102,18 +117,20 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Вы лайкнули в ответ!")
     data = await state.get_data()
     idx = data.get("current_index", 0)
-    await state.update_data(current_index=idx+1)
-    await show_like_card(callback.message, state, session)
+    await state.update_data(current_index=idx + 1)
+    await show_like_card(callback.message, state, session, edit=True)
 
 @router.callback_query(F.data.startswith("skip_like_"))
 async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     idx = data.get("current_index", 0)
-    await state.update_data(current_index=idx+1)
-    await show_like_card(callback.message, state, session)
+    await state.update_data(current_index=idx + 1)
+    await show_like_card(callback.message, state, session, edit=True)
+    await callback.answer()
 
 @router.callback_query(F.data == "likes_back")
 async def likes_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
+    await callback.message.delete()
     await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
     await callback.answer()

@@ -37,10 +37,6 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 async def search_command(message: Message, state: FSMContext, session: AsyncSession):
     await show_candidate(message, state, session)
 
-@router.message(F.text == "Поиск")
-async def search_button_handler(message: Message, state: FSMContext, session: AsyncSession):
-    await search_command(message, state, session)
-
 @router.callback_query(F.data == "browse")
 async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     await callback.message.delete()
