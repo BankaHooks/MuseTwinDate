@@ -73,7 +73,7 @@ async def search_command(message: Message, state: FSMContext, session: AsyncSess
 @router.callback_query(F.data == "browse")
 async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     await callback.message.delete()
-    await show_candidate(callback.message, state, session)
+    await show_candidate(callback, state, session)
     await callback.answer()
 
 @router.callback_query(F.data == "show_all")
@@ -85,7 +85,7 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
     await session.commit()
     await callback.message.delete()
-    await show_candidate(callback.message, state, session)
+    await show_candidate(callback, state, session)
     await callback.answer()
 
 @router.callback_query(F.data == "like", Browse.candidate_id)
@@ -171,19 +171,26 @@ async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
         return
     await state.update_data(like_target=candidate_id)
     await state.set_state(LikeMessageState.text)
-    await callback.message.edit_caption(
-        caption="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_envelope")]
-        ])
-    )
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_envelope")]
+    ])
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
+            reply_markup=markup
+        )
+    else:
+        await callback.message.edit_text(
+            text="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
+            reply_markup=markup
+        )
     await callback.answer()
 
 @router.callback_query(F.data == "cancel_envelope")
 async def cancel_envelope(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     await state.clear()
     await callback.message.delete()
-    await show_candidate(callback.message, state, session)
+    await show_candidate(callback, state, session)
     await callback.answer()
 
 @router.message(LikeMessageState.text)
