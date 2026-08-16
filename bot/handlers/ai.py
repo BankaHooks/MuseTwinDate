@@ -289,7 +289,12 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("blind_date_listen_"))
 async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
-    blind_date_id = int(callback.data.split("_")[3])
+    try:
+        blind_date_id = int(callback.data.split("_")[-1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный идентификатор.", show_alert=True)
+        return
+
     blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
     if not blind_date:
         await callback.answer("Это свидание уже неактивно.", show_alert=True)
