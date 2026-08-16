@@ -60,7 +60,7 @@ async def process_gender(callback: CallbackQuery, state: FSMContext):
     await state.update_data(gender=gender)
     await state.set_state(RegistrationState.age)
     await callback.message.delete()
-    await callback.message.answer("Сколько вам лет? (от 18 до 99)")
+    await callback.message.answer("Сколько вам лет? (от 16 до 99)")
     await callback.answer()
 
 @router.message(RegistrationState.age)
@@ -70,7 +70,7 @@ async def process_age(message: Message, state: FSMContext):
         return
     age = int(message.text)
     if not validate_age(age):
-        await message.answer("Возраст должен быть от 18 до 99 лет.")
+        await message.answer("Возраст должен быть от 16 до 99 лет.")
         return
     await state.update_data(age=age)
     await state.set_state(RegistrationState.city)

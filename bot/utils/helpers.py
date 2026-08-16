@@ -68,7 +68,7 @@ GOAL_TRANSLATE = {
 def validate_age(age_str):
     try:
         age = int(age_str)
-        return 18 <= age <= 99
+        return 16 <= age <= 99
     except ValueError:
         return False
 
