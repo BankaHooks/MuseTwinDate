@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from database import crud
 from config import config
-from keyboards.inline import premium_payment_methods_keyboard, premium_stars_plans_keyboard, premium_rub_plans_keyboard, premium_features_keyboard
+from keyboards.inline import premium_payment_methods_keyboard, premium_stars_plans_keyboard, premium_features_keyboard
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,19 @@ async def premium_menu(callback: CallbackQuery, session: AsyncSession):
         text += "Выберите способ оплаты:"
     await callback.message.edit_text(text, reply_markup=premium_payment_methods_keyboard())
     await callback.answer()
+
+async def show_premium_for_message(message: Message, session: AsyncSession):
+    """Функция для вызова из menu.py при нажатии кнопки 'Купить премиум'"""
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    if not user:
+        await message.answer("Зарегистрируйтесь через /start")
+        return
+    text = "💎 Премиум-подписка\n\n"
+    if user.is_premium and user.premium_expiry and user.premium_expiry > datetime.utcnow():
+        text += f"У вас активна подписка до {user.premium_expiry.strftime('%d.%m.%Y %H:%M')}."
+    else:
+        text += "Выберите способ оплаты:"
+    await message.answer(text, reply_markup=premium_payment_methods_keyboard())
 
 @router.callback_query(F.data == "premium_stars")
 async def premium_stars(callback: CallbackQuery, session: AsyncSession):
