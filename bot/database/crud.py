@@ -2,7 +2,7 @@ from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from typing import List, Optional
-from .models import User, Like, Skip, Block, Report, Chat, Payment
+from .models import User, Like, Skip, Block, Report, Chat, Payment, BlindDate
 
 async def create_user(session: AsyncSession, telegram_id: int, username: str = None, **kwargs) -> User:
     user = User(telegram_id=telegram_id, username=username, **kwargs)
@@ -211,4 +211,46 @@ async def get_random_real_user(session: AsyncSession) -> Optional[User]:
     )
     stmt = stmt.order_by(func.random()).limit(1)
     result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+async def create_blind_date(session: AsyncSession, user1_id: int, user2_id: int, song: str, artist: str) -> BlindDate:
+    blind_date = BlindDate(
+        user1_id=user1_id,
+        user2_id=user2_id,
+        song=song,
+        artist=artist,
+        user1_listened=False,
+        user2_listened=False
+    )
+    session.add(blind_date)
+    await session.commit()
+    await session.refresh(blind_date)
+    return blind_date
+
+async def get_blind_date_by_id(session: AsyncSession, blind_date_id: int) -> Optional[BlindDate]:
+    result = await session.execute(select(BlindDate).where(BlindDate.id == blind_date_id))
+    return result.scalar_one_or_none()
+
+async def mark_blind_date_listened(session: AsyncSession, blind_date_id: int, user_id: int) -> bool:
+    blind_date = await get_blind_date_by_id(session, blind_date_id)
+    if not blind_date:
+        return False
+    if blind_date.user1_id == user_id:
+        blind_date.user1_listened = True
+    elif blind_date.user2_id == user_id:
+        blind_date.user2_listened = True
+    else:
+        return False
+    await session.commit()
+    return blind_date.user1_listened and blind_date.user2_listened
+
+async def get_active_blind_date(session: AsyncSession, user_id: int) -> Optional[BlindDate]:
+    result = await session.execute(
+        select(BlindDate).where(
+            or_(
+                and_(BlindDate.user1_id == user_id, BlindDate.user1_listened == False),
+                and_(BlindDate.user2_id == user_id, BlindDate.user2_listened == False)
+            )
+        ).order_by(BlindDate.created_at.desc()).limit(1)
+    )
     return result.scalar_one_or_none()

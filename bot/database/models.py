@@ -102,3 +102,17 @@ class Payment(Base):
     duration_months = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
     expiry_date = Column(DateTime, nullable=False)
+
+class BlindDate(Base):
+    __tablename__ = "blind_dates"
+    id = Column(Integer, primary_key=True)
+    user1_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user2_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    song = Column(String(255), nullable=False)
+    artist = Column(String(255), nullable=False)
+    user1_listened = Column(Boolean, default=False)
+    user2_listened = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user1 = relationship("User", foreign_keys=[user1_id])
+    user2 = relationship("User", foreign_keys=[user2_id])
