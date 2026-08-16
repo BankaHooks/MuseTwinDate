@@ -14,7 +14,6 @@ from keyboards.inline import (
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
 from utils.media import save_photo
-from utils.embeddings import update_user_embedding
 
 router = Router()
 
@@ -104,7 +103,6 @@ async def reset_profile(callback: CallbackQuery, state: FSMContext, session: Asy
     ]
     for field in fields:
         setattr(user, field, None)
-    user.embedding = None
     await session.commit()
     await state.set_state(Registration.name)
     await callback.message.delete()
@@ -187,7 +185,6 @@ async def edit_genres_done(callback: CallbackQuery, state: FSMContext, session: 
     genre_str = ", ".join(genres)
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, favorite_genres=genre_str)
-    await update_user_embedding(session, user)
     await state.clear()
     await callback.message.edit_text("Жанры обновлены", reply_markup=main_reply_keyboard())
     await callback.answer()
@@ -205,7 +202,6 @@ async def edit_bands(message: Message, state: FSMContext, session: AsyncSession)
         bands = ", ".join(bands)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, favorite_bands=bands)
-    await update_user_embedding(session, user)
     await state.clear()
     await message.answer("Группы обновлены", reply_markup=main_reply_keyboard())
 
@@ -260,7 +256,6 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
     interest_str = ", ".join(selected) if selected else None
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, interests=interest_str)
-    await update_user_embedding(session, user)
     await state.clear()
     await callback.message.edit_text("Интересы обновлены", reply_markup=main_reply_keyboard())
     await callback.answer()
@@ -314,7 +309,6 @@ async def edit_songs(message: Message, state: FSMContext, session: AsyncSession)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     songs = None if message.text.lower() == "пропустить" else message.text
     await crud.update_user(session, user, favorite_songs=songs)
-    await update_user_embedding(session, user)
     await state.clear()
     await message.answer("Песни обновлены", reply_markup=main_reply_keyboard())
 
@@ -322,7 +316,6 @@ async def edit_songs(message: Message, state: FSMContext, session: AsyncSession)
 async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, bio=message.text)
-    await update_user_embedding(session, user)
     await state.clear()
     await message.answer("Био обновлено", reply_markup=main_reply_keyboard())
 
