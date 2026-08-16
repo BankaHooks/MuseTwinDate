@@ -15,3 +15,6 @@ class ProfileEditState(StatesGroup):
     preferred_gender = State()
     bio = State()
     photo = State()
+
+class ProfileEdit(ProfileEditState):
+    pass
