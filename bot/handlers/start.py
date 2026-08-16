@@ -258,6 +258,13 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
             await enrich_profile_with_vk(user, session, config.VK_ACCESS_TOKEN)
         await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
     await state.clear()
+    await message.answer(
+    "✅ Регистрация завершена!\n\n"
+    "🔗 Вы также можете привязать VK для более точного подбора по музыкальным предпочтениям.\n"
+    "Для этого зайдите в профиль → Редактировать профиль → Импорт из VK. \n" \
+    "А также в профиле мы можете выключить анкету, и сменить режим поиска (по всей стране/только в своем городе) \n" \
+    "[Настоятельно рекомендуется использовать поиск по всей стране на время запуска бота]"
+    )   
 
 @router.callback_query(F.data == "cancel")
 async def cancel_callback(callback: CallbackQuery, state: FSMContext):

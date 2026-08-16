@@ -76,3 +76,13 @@ async def get_user_audio(user_id: str, token: str, limit: int = 10) -> List[Dict
             "url": item.get("url", "")
         })
     return audio_list
+
+async def resolve_vk_user_id(screen_name: str, token: str) -> Optional[str]:
+    params = {
+        "user_ids": screen_name,
+        "fields": "id"
+    }
+    result = await _vk_request("users.get", params, token)
+    if result and isinstance(result, list) and len(result) > 0:
+        return str(result[0].get("id"))
+    return None
