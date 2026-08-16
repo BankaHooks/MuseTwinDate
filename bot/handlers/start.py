@@ -3,6 +3,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 from database import crud
 from database.models import User
 from keyboards.inline import (
@@ -368,6 +369,23 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
     if not user.referral_code:
         user.referral_code = await crud.generate_referral_code(session, user.telegram_id)
         await session.commit()
+
+    # Уведомление админам о новом пользователе
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await bot.send_message(
+                admin_id,
+                f"🆕 Новый пользователь!\n"
+                f"ID: {user.id}\n"
+                f"Telegram ID: {user.telegram_id}\n"
+                f"Имя: {user.name or 'Не указано'}\n"
+                f"Возраст: {user.age or 'Не указан'}\n"
+                f"Город: {user.city or 'Не указан'}\n"
+                f"Username: @{user.username if user.username else 'Нет'}\n"
+                f"Время: {datetime.utcnow().strftime('%d.%m.%Y %H:%M UTC')}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send admin notification: {e}")
 
     await state.clear()
     await message.answer(
