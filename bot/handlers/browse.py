@@ -7,7 +7,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import Skip
-from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard
+from keyboards.inline import browse_actions_keyboard, report_reason_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
 from states.like_message import LikeMessageState
@@ -303,57 +303,6 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
             pass
 
     text = format_user_card(candidate, score)
-    markup = browse_actions_keyboard()
-    try:
-        if candidate.photo_file_id:
-            await callback.message.edit_media(
-                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-                reply_markup=markup
-            )
-        else:
-            await callback.message.edit_text(text, reply_markup=markup)
-    except Exception as e:
-        await callback.message.edit_text(text, reply_markup=markup)
-    await callback.answer()
-
-@router.callback_query(F.data == "view_profile", Browse.candidate_id)
-async def view_profile_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    data = await state.get_data()
-    candidate_id = data.get("candidate_id")
-    if not candidate_id:
-        await callback.answer("Нет анкеты.")
-        return
-    candidate = await crud.get_user_by_id(session, candidate_id)
-    if not candidate:
-        await callback.answer("Не найден.")
-        return
-    text = format_user_card(candidate) + "\n\nДополнительно:"
-    markup = profile_actions_keyboard()
-    try:
-        if candidate.photo_file_id:
-            await callback.message.edit_media(
-                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-                reply_markup=markup
-            )
-        else:
-            await callback.message.edit_text(text, reply_markup=markup)
-    except Exception as e:
-        await callback.message.edit_text(text, reply_markup=markup)
-    await callback.answer()
-
-@router.callback_query(F.data == "back_to_browse", Browse.candidate_id)
-async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    data = await state.get_data()
-    candidate_id = data.get("candidate_id")
-    if not candidate_id:
-        await callback.answer("Ошибка.")
-        return
-    candidate = await crud.get_user_by_id(session, candidate_id)
-    if not candidate:
-        await callback.answer("Не найден.")
-        return
-    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    text = format_user_card(candidate)
     markup = browse_actions_keyboard()
     try:
         if candidate.photo_file_id:
