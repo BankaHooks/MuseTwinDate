@@ -13,6 +13,7 @@ from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
 from handlers import start, menu, browse, likes, profile, premium, report, admin, ai
+import random
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)

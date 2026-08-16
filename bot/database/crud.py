@@ -31,7 +31,7 @@ async def create_like(session: AsyncSession, from_user_id: int, to_user_id: int)
             and_(Like.from_user_id == from_user_id, Like.to_user_id == to_user_id)
         )
     )
-    existing = existing.scalar_one_or_none()
+    existing = existing.scalars().first()
     if existing:
         return existing
     like = Like(from_user_id=from_user_id, to_user_id=to_user_id)

@@ -128,6 +128,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     questions = await generate_blind_date_questions(song, user, partner)
     safe_song = escape_markdown(song)
     partner_name = escape_markdown(partner.name or "партнёром")
+    # Экранируем каждый вопрос
+    safe_questions = [escape_markdown(q) for q in questions]
     if partner.username:
         partner_link = f"@{partner.username}"
     else:
@@ -135,7 +137,7 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     text = f"🌹 Свидание вслепую с {partner_name}!\n\n"
     text += f"🎵 Общий трек для прослушивания: **{safe_song}**\n\n"
     text += "Обсудите эти вопросы после прослушивания:\n"
-    for i, q in enumerate(questions, 1):
+    for i, q in enumerate(safe_questions, 1):
         text += f"{i}. {q}\n"
     text += f"\nНапишите партнёру: {partner_link}\n"
     text += "Обсудите трек и поделитесь впечатлениями!"
