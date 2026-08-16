@@ -1,6 +1,6 @@
 import aiohttp
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import User
@@ -61,3 +61,20 @@ async def enrich_profile_with_vk(user: User, session: AsyncSession, token: str):
         await crud.update_user(session, user, favorite_bands=new_bands_str)
         return similar
     return []
+
+async def get_user_audio(user_id: str, token: str, limit: int = 10) -> List[Dict[str, str]]:
+    params = {
+        "owner_id": user_id,
+        "count": limit,
+        "need_video": 0
+    }
+    result = await _vk_request("audio.get", params, token)
+    items = result.get("items", [])
+    audio_list = []
+    for item in items:
+        audio_list.append({
+            "artist": item.get("artist", ""),
+            "title": item.get("title", ""),
+            "url": item.get("url", "")
+        })
+    return audio_list
