@@ -225,7 +225,11 @@ async def edit_interest_item(callback: CallbackQuery, state: FSMContext):
     category = data.get("current_category", "")
     if category:
         markup = interest_items_keyboard(category, selected)
-        await callback.message.edit_reply_markup(reply_markup=markup)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=markup)
+        except Exception:
+            pass  # Ignore "message not modified" errors
+    await callback.answer()
 
 @router.callback_query(F.data == "interests_back", StateFilter(ProfileEditState.interests))
 async def edit_interests_back(callback: CallbackQuery, state: FSMContext):
@@ -272,7 +276,11 @@ async def edit_game_item(callback: CallbackQuery, state: FSMContext):
     category = data.get("current_game_category", "")
     if category:
         markup = games_items_keyboard(category, selected)
-        await callback.message.edit_reply_markup(reply_markup=markup)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=markup)
+        except Exception:
+            pass  # Ignore "message not modified" errors
+    await callback.answer()
 
 @router.callback_query(F.data == "games_back", StateFilter(ProfileEditState.games))
 async def edit_games_back(callback: CallbackQuery, state: FSMContext):
