@@ -228,7 +228,7 @@ async def edit_interest_item(callback: CallbackQuery, state: FSMContext):
         try:
             await callback.message.edit_reply_markup(reply_markup=markup)
         except Exception:
-            pass  # Ignore "message not modified" errors
+            pass
     await callback.answer()
 
 @router.callback_query(F.data == "interests_back", StateFilter(ProfileEditState.interests))
@@ -279,7 +279,7 @@ async def edit_game_item(callback: CallbackQuery, state: FSMContext):
         try:
             await callback.message.edit_reply_markup(reply_markup=markup)
         except Exception:
-            pass  # Ignore "message not modified" errors
+            pass
     await callback.answer()
 
 @router.callback_query(F.data == "games_back", StateFilter(ProfileEditState.games))
@@ -393,7 +393,6 @@ async def refresh_recommendations(callback: CallbackQuery, session: AsyncSession
 
 async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, **extra):
     data = await state.get_data()
-    field = data.get("edit_field")
     user = await crud.get_user_by_telegram_id(session, event.from_user.id)
     if not user:
         if isinstance(event, CallbackQuery):
@@ -410,6 +409,9 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     for key, value in update_data.items():
         if hasattr(user, key):
             setattr(user, key, value)
+    # Явно сохраняем favorite_games, если есть
+    if "games" in data:
+        user.favorite_games = data["games"]
     await session.commit()
     await state.clear()
     if isinstance(event, Message):

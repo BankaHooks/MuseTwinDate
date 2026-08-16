@@ -178,7 +178,7 @@ def interest_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def interest_items_keyboard(category, selected):
-    category = _restore(category)
+    category = category.strip()
     topics = INTEREST_CATEGORIES.get(category, [])
     buttons = []
     for topic in topics:
@@ -197,7 +197,7 @@ def games_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def games_items_keyboard(category, selected):
-    category = _restore(category)
+    category = category.strip()
     games = GAMES_CATEGORIES.get(category, [])
     buttons = []
     for game in games:
