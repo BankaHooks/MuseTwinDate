@@ -18,7 +18,7 @@ def admin_keyboard():
         [InlineKeyboardButton(text="Отправить уведомление", callback_data="admin_notify")],
         [InlineKeyboardButton(text="Выдать премиум", callback_data="admin_premium")],
         [InlineKeyboardButton(text="Список пользователей", callback_data="admin_users")],
-        [InlineKeyboardButton(text="Просмотр репортов", callback_data="admin_reports")],
+        [InlineKeyboardButton(text="Просмотр репортов", callback_data="admin_reports_0")],
         [InlineKeyboardButton(text="Закрыть", callback_data="admin_close")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -35,19 +35,24 @@ async def admin_close(callback: CallbackQuery):
     await callback.message.delete()
     await callback.answer()
 
-@router.callback_query(F.data == "admin_reports")
+@router.callback_query(F.data.startswith("admin_reports_"))
 async def admin_reports(callback: CallbackQuery, session: AsyncSession):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("Нет прав")
         return
-    reports = await crud.get_reports(session, resolved=False)
+    page = int(callback.data.split("_")[2]) if len(callback.data.split("_")) > 2 else 0
+    limit = 5
+    offset = page * limit
+    reports = await crud.get_reports(session, resolved=False, offset=offset, limit=limit + 1)
     if not reports:
         await callback.message.edit_text("Нет непросмотренных репортов.", reply_markup=admin_keyboard())
         await callback.answer()
         return
+    has_more = len(reports) > limit
+    reports = reports[:limit]
     text = "📋 Непросмотренные репорты:\n\n"
     buttons = []
-    for r in reports[:10]:
+    for r in reports:
         reporter = await crud.get_user_by_id(session, r.reporter_id)
         reported = await crud.get_user_by_id(session, r.reported_id)
         reason_ru = {
@@ -65,6 +70,13 @@ async def admin_reports(callback: CallbackQuery, session: AsyncSession):
             text=f"👤 Анкета (ID {reported.id})",
             callback_data=f"admin_user_detail_{reported.id}"
         )])
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"admin_reports_{page-1}"))
+    if has_more:
+        nav.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"admin_reports_{page+1}"))
+    if nav:
+        buttons.append(nav)
     buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")])
     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
     await callback.message.edit_text(text, reply_markup=markup)
@@ -99,7 +111,6 @@ async def admin_users_list(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Нет прав")
         return
     parts = callback.data.split("_")
-    # admin_users_list_all_0 -> parts = ['admin', 'users', 'list', 'all', '0']
     gender = parts[3]
     page = int(parts[4])
     limit = 10

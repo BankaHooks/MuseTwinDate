@@ -12,6 +12,7 @@ from keyboards.inline import premium_features_keyboard, browse_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.security import escape_markdown
 from states.browse import Browse
+from config import config
 
 router = Router()
 
@@ -75,6 +76,9 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
     if not user or not user.is_premium:
         await callback.answer("Только для премиум!", show_alert=True)
         return
+    if not config.GIGACHAT_API_KEY:
+        await callback.message.edit_text("AI-функции недоступны: отсутствует API-ключ GigaChat.")
+        return
     await callback.message.edit_text("Ищу идеальную пару с помощью AI...")
     pool = await crud.get_candidate_pool(session, user.id)
     if not pool:
@@ -108,6 +112,9 @@ async def ai_music_profile(callback: CallbackQuery, session: AsyncSession):
     if not user or not user.is_premium:
         await callback.answer("Только для премиум!", show_alert=True)
         return
+    if not config.GIGACHAT_API_KEY:
+        await callback.message.edit_text("AI-функции недоступны: отсутствует API-ключ GigaChat.", reply_markup=premium_features_keyboard())
+        return
     await callback.message.edit_text("Анализируем ваш музыкальный вкус...")
     analysis = await analyze_music_taste(user)
     await callback.message.edit_text(f"🎵 Ваш музыкальный профиль:\n\n{analysis}", reply_markup=premium_features_keyboard())
@@ -118,6 +125,9 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user or not user.is_premium:
         await callback.answer("Только для премиум!", show_alert=True)
+        return
+    if not config.GIGACHAT_API_KEY:
+        await callback.message.edit_text("AI-функции недоступны: отсутствует API-ключ GigaChat.", reply_markup=premium_features_keyboard())
         return
     candidates = await crud.get_candidate_pool(session, user.id, limit=50)
     if not candidates:
