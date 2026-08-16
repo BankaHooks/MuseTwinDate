@@ -66,10 +66,9 @@ GOAL_RU = {
     "friendship": "дружбы", "relationship": "отношений"
 }
 
-EMOJIS = ["💕", "✨", "🩷", "💌", "🌸", "❤️", "🌟", "🎵", "🎶", "😊", "👋", "☀️", "🌺", "🦋", "🐱", "🌙", "⭐"]
+EMOJIS = ["💕", "✨", "🍀", "🩷", "💌", "🌸", "❤️", "🫶", "🌟", "🎵", "🎶", "😊", "✌️", "👋", "☀️", "🌺", "🦋", "🐱", "🌙", "⭐"]
 
 BIO_TEMPLATES = [
-    # короткие
     "{name}, {age}, {city}. Ищу общение и дружбу. {hobby1}.",
     "{name}, {age}, {city}. Люблю {hobby1} и {hobby2}. Давай общаться! {emoji}",
     "{name}, {age}, {city}. Просто ищу классного собеседника. {emoji}",
@@ -81,7 +80,6 @@ BIO_TEMPLATES = [
     "Здесь {name}, {age}. Люблю {hobby1} и {hobby2}. В музыке предпочитаю {music}. Ищу общение и дружбу. {emoji}",
     "{name}, {age}, {city}. Интересуюсь {interests}. В музыке — {music}. Буду рада новым знакомствам! {emoji}",
     "{name}, {age}, {city}. Обожаю {hobby1}, слушаю {music}. Ищу {goal_ru}. Пиши, не стесняйся! {emoji}",
-    "",
     "",
     "{name}, {age}, {city}. Просто хочу пообщаться. 🫶",
     "{name}, {age}, {city}. {hobby1} – моё всё. Ищу компанию для прогулок и разговоров. {emoji}",
@@ -96,16 +94,12 @@ def generate_bio(name, age, city, music_text, interests_text, goal):
     hobby3 = random.choice([h for h in HOBBIES if h not in (hobby1, hobby2)])
     emoji = random.choice(EMOJIS)
     goal_ru = GOAL_RU.get(goal, "знакомства")
-
-    # Если интересы не пустые, используем их, иначе берём случайные хобби
     if interests_text and random.random() < 0.5:
         interests_part = interests_text
     else:
         interests_part = f"{hobby1}, {hobby2}"
-
     if not music_text:
         music_text = random.choice(GENRES)
-
     text = template.format(
         name=name,
         age=age,
@@ -145,11 +139,10 @@ async def seed_users():
             await session.commit()
 
         total = 80
+        # Используем pravatar.cc – гарантированно отдаёт фото людей
         photo_urls = []
-        for i in range(1, 150, 3):
-            photo_urls.append(f"https://randomuser.me/api/portraits/men/{i}.jpg")
-            photo_urls.append(f"https://randomuser.me/api/portraits/women/{i+1}.jpg")
-            photo_urls.append(f"https://randomuser.me/api/portraits/men/{i+2}.jpg")
+        for i in range(1, 200):
+            photo_urls.append(f"https://i.pravatar.cc/300?img={i}")
         random.shuffle(photo_urls)
 
         all_topics = []
@@ -207,7 +200,7 @@ async def seed_users():
             if (i + 1) % 10 == 0:
                 print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print(f"Готово! Создано {total} реалистичных анкет с живыми описаниями.")
+    print(f"Готово! Создано {total} реалистичных анкет с фото от pravatar.cc.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())
