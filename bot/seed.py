@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from config import config
 from database.models import User, Base
 
-# ----- Данные для генерации -----
 NAMES = ["Алексей", "Мария", "Иван", "Екатерина", "Дмитрий", "Анна", "Сергей", "Ольга",
          "Андрей", "Наталья", "Максим", "Елена", "Владимир", "Ирина", "Павел", "Светлана",
          "Юрий", "Татьяна", "Артем", "Виктория", "Никита", "Анастасия", "Кирилл", "Дарья"]
@@ -26,7 +25,7 @@ SONGS = ["Bohemian Rhapsody", "Imagine", "Hotel California", "Stairway to Heaven
          "Bad Guy", "Blinding Lights", "Levitating", "Montero", "Stay", "Peaches"]
 
 BIOS = [
-    "Люблю музыку и путешествия 🎸",
+    "Люблю музыку и путешествия",
     "Ищу единомышленников для концертов",
     "Музыка — моя жизнь, джаз и рок в душе",
     "Обожаю электронную музыку и фестивали",
@@ -38,7 +37,7 @@ BIOS = [
     "Люблю открывать новую музыку и делиться ей"
 ]
 
-PREFERRED_GENDERS = ["male", "female", "any"]
+PREFERRED_GENDERS = ["Мужской", "Женский", "Любой"]
 
 async def seed_users():
     engine = create_async_engine(config.DATABASE_URL, echo=False)
@@ -47,7 +46,7 @@ async def seed_users():
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        for i in range(67):
+        for i in range(40):
             name = random.choice(NAMES)
             age = random.randint(18, 40)
             city = random.choice(CITIES)
@@ -56,14 +55,15 @@ async def seed_users():
             songs = random.sample(SONGS, 2)
             songs_text = ", ".join(songs)
             bio = random.choice(BIOS)
-            gender = random.choice(["male", "female"])
+            gender = random.choice(["Мужской", "Женский"])
             pref_gender = random.choice(PREFERRED_GENDERS)
+            photo_url = f"https://picsum.photos/seed/{i}/300/400"
 
             user = User(
                 telegram_id = -i - 1,
                 username = f"user_{i}",
                 name = name,
-                gender = random.choice(["Мужской", "Женский"]),
+                gender = gender,
                 age = age,
                 city = city,
                 favorite_genres = genre,
@@ -71,14 +71,15 @@ async def seed_users():
                 favorite_songs = songs_text,
                 preferred_gender = pref_gender,
                 bio = bio,
-                is_premium = random.choice([True, False, False, False]),  # 25% премиум
+                photo_file_id = photo_url,
+                is_premium = random.choice([True, False, False, False]),
                 created_at = datetime.utcnow()
             )
             session.add(user)
             if (i + 1) % 10 == 0:
-                print(f"✅ Создано {i+1} пользователей...")
+                print(f"Создано {i+1} пользователей...")
         await session.commit()
-    print("🎉 Готово! Создано 67 тестовых анкет.")
+    print("Готово! Создано 40 тестовых анкет с фото.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())

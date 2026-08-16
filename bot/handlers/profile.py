@@ -29,7 +29,7 @@ async def profile_view(callback: CallbackQuery, session: AsyncSession):
     mutual = await crud.get_mutual_likes_count(session, user.id)
 
     text = format_profile(user)
-    text += f"\n📊 Статистика лайков:\n"
+    text += f"\n\n📊 Статистика лайков:\n"
     text += f"Получено: {received}\n"
     text += f"Отправлено: {given}\n"
     text += f"Взаимных: {mutual}"
@@ -40,6 +40,27 @@ async def profile_view(callback: CallbackQuery, session: AsyncSession):
     else:
         await callback.message.answer(text, reply_markup=profile_main_keyboard())
     await callback.answer()
+
+async def show_profile_for_message(message: Message, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    if not user:
+        await message.answer("Зарегистрируйтесь через /start")
+        return
+
+    received = await crud.get_likes_count(session, user.id)
+    given = await crud.get_likes_given_count(session, user.id)
+    mutual = await crud.get_mutual_likes_count(session, user.id)
+
+    text = format_profile(user)
+    text += f"\n\n📊 Статистика лайков:\n"
+    text += f"Получено: {received}\n"
+    text += f"Отправлено: {given}\n"
+    text += f"Взаимных: {mutual}"
+
+    if user.photo_file_id:
+        await message.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_main_keyboard())
+    else:
+        await message.answer(text, reply_markup=profile_main_keyboard())
 
 @router.callback_query(F.data == "profile_back")
 async def profile_back(callback: CallbackQuery, session: AsyncSession):
