@@ -1,6 +1,15 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
-import re
+
+def _clean(text):
+    if not text:
+        return ""
+    return text.replace(' ', '_')
+
+def _restore(text):
+    if not text:
+        return ""
+    return text.replace('_', ' ')
 
 INTEREST_CATEGORIES = {
     "Спорт": [
@@ -79,13 +88,6 @@ GAMES_CATEGORIES = {
         "Cyberpunk 2077", "Resident Evil Requiem", "Silent Hill f", "Death Stranding 2: On the Beach"
     ]
 }
-
-def _clean(text):
-    cleaned = re.sub(r'[^a-zA-Zа-яА-Я0-9\s]', '', text)
-    return cleaned.replace(' ', '_')
-
-def _restore(text):
-    return text.replace('_', ' ')
 
 def welcome_keyboard():
     buttons = [
@@ -176,7 +178,7 @@ def interest_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def interest_items_keyboard(category, selected):
-    category = category.strip()
+    category = _restore(category)
     topics = INTEREST_CATEGORIES.get(category, [])
     buttons = []
     for topic in topics:
@@ -195,7 +197,7 @@ def games_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def games_items_keyboard(category, selected):
-    category = category.strip()
+    category = _restore(category)
     games = GAMES_CATEGORIES.get(category, [])
     buttons = []
     for game in games:
