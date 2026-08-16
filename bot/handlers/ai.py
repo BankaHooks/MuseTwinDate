@@ -8,7 +8,7 @@ import random
 import asyncio
 from database import crud
 from database.models import Skip, Like, BlindDate
-from utils.ai import analyze_music_taste, generate_blind_date_questions, get_match_explanation
+from utils.ai import analyze_music_taste, generate_blind_date_questions
 from utils.matching import get_candidates_sorted
 from keyboards.inline import (
     premium_features_keyboard, browse_actions_keyboard,
@@ -199,10 +199,8 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
         await callback.answer()
         return
 
-    # score уже в процентах (0..100)
     candidates_data = [{"id": cand.id, "score": score} for cand, score in scored]
     await state.update_data(ai_candidates=candidates_data, ai_index=0)
-    # Передаём также текущего пользователя для пояснений
     await state.update_data(ai_user=user)
     await show_ai_candidate(callback.message, state, session, edit=False, bot=callback.bot)
     await callback.answer()
@@ -211,7 +209,7 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
     data = await state.get_data()
     candidates = data.get("ai_candidates", [])
     index = data.get("ai_index", 0)
-    user = data.get("ai_user")  # текущий пользователь
+    user = data.get("ai_user")
     if not candidates or index >= len(candidates):
         text = "Вы просмотрели всех AI-рекомендованных кандидатов."
         markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -235,14 +233,14 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
     from utils.helpers import format_user_card
     text = format_user_card(candidate, score)
 
-    # Добавляем AI-пояснение, если ключ есть и функция доступна
-    if config.GIGACHAT_API_KEY and user:
-        try:
-            explanation = await get_match_explanation(user, candidate, score)
-            if explanation:
-                text += f"\n\n🤖 AI-пояснение: {explanation}"
-        except Exception as e:
-            logger.error(f"AI explanation error: {e}")
+    # AI-пояснение временно отключено (функция get_match_explanation не реализована)
+    # if config.GIGACHAT_API_KEY and user:
+    #     try:
+    #         explanation = await get_match_explanation(user, candidate, score)
+    #         if explanation:
+    #             text += f"\n\n🤖 AI-пояснение: {explanation}"
+    #     except Exception as e:
+    #         logger.error(f"AI explanation error: {e}")
 
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"ai_like_{candidate_id}"),
@@ -341,7 +339,6 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Только для премиум!", show_alert=True)
         return
 
-    # Проверяем активное свидание
     active = await session.execute(
         select(BlindDate).where(
             or_(
@@ -355,7 +352,6 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("У вас уже есть активное свидание! Дождитесь партнёра.", show_alert=True)
         return
 
-    # Берём пул кандидатов
     candidates = await crud.get_candidate_pool(session, user.id, limit=50)
     if not candidates:
         await edit_or_caption(callback, "😕 Нет подходящих кандидатов для свидания вслепую.\nПопробуйте позже.")
@@ -389,7 +385,6 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     await edit_or_caption(callback, text, reply_markup=markup, parse_mode="Markdown")
     await callback.answer()
 
-    # Уведомление партнёру
     partner_text = (f"🌹 {user.name or 'Кто-то'} пригласил вас на свидание вслепую!\n\n"
                     f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
                     "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра...")
@@ -402,7 +397,6 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     except Exception as e:
         logger.error(f"Не удалось отправить приглашение партнёру: {e}")
 
-    # Таймаут 10 минут
     asyncio.create_task(blind_date_timeout(blind_date_obj.id, callback.bot, session.bind))
 
 async def blind_date_timeout(blind_date_id: int, bot, session_maker):
