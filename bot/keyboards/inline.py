@@ -57,6 +57,13 @@ def _clean(text):
 def _restore(text):
     return text.replace('_', ' ')
 
+def welcome_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="Начать регистрацию", callback_data="welcome_start")],
+        [InlineKeyboardButton(text="Написать в ЛС @danhooks", url="https://t.me/danhooks")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 def main_menu_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Поиск", callback_data="browse")],

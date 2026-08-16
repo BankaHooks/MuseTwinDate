@@ -46,7 +46,9 @@ async def show_like_card(target: Message, state: FSMContext, session: AsyncSessi
     if idx >= len(like_ids):
         if edit:
             await target.delete()
-        await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+        else:
+            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
         await state.clear()
         return
     user_id = like_ids[idx]
@@ -83,13 +85,17 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
     if not target:
         await callback.answer("Пользователь не найден.")
         return
-    # Проверяем, есть ли уже лайк
+    # Проверяем, есть ли уже лайк от пользователя к цели
     existing = await crud.create_like(session, user.id, target.id)
     if existing and existing.is_mutual:
         await callback.answer("Уже взаимно!")
+        # Переключаем на следующую анкету
+        data = await state.get_data()
+        idx = data.get("current_index", 0)
+        await state.update_data(current_index=idx + 1)
+        await show_like_card(callback.message, state, session, edit=True)
         return
-    like = existing if existing else await crud.create_like(session, user.id, target.id)
-    # Уведомление о количестве лайков
+    like = await crud.create_like(session, user.id, target.id)
     total_likes = await get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
@@ -130,7 +136,6 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Вы лайкнули в ответ!")
-    # Переход к следующей анкете
     data = await state.get_data()
     idx = data.get("current_index", 0)
     await state.update_data(current_index=idx + 1)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, delete
 from config import config
 from database.models import User, Base
+from keyboards.inline import INTEREST_CATEGORIES
 
 NAMES = ["Алексей", "Мария", "Иван", "Екатерина", "Дмитрий", "Анна", "Сергей", "Ольга",
          "Андрей", "Наталья", "Максим", "Елена", "Владимир", "Ирина", "Павел", "Светлана",
@@ -77,14 +78,22 @@ async def seed_users():
                 return
 
         total = 50
+        # Фото с randomuser.me
+        photo_urls = []
+        for i in range(1, 100, 3):
+            photo_urls.append(f"https://randomuser.me/api/portraits/men/{i}.jpg")
+            photo_urls.append(f"https://randomuser.me/api/portraits/women/{i+1}.jpg")
+            photo_urls.append(f"https://randomuser.me/api/portraits/men/{i+2}.jpg")
+        random.shuffle(photo_urls)
+
+        # Получаем все темы из новых категорий
+        all_topics = []
+        for topics in INTEREST_CATEGORIES.values():
+            all_topics.extend(topics)
+
         for i in range(total):
             gender = random.choice(["Мужской", "Женский"])
-            photo_id = random.randint(1, 99)
-            if gender == "Мужской":
-                photo_url = f"https://randomuser.me/api/portraits/men/{photo_id}.jpg"
-            else:
-                photo_url = f"https://randomuser.me/api/portraits/women/{photo_id}.jpg"
-
+            photo_url = photo_urls[i % len(photo_urls)]
             name = random.choice(NAMES)
             age = random.randint(18, 45)
             city = random.choice(CITIES)
@@ -94,6 +103,8 @@ async def seed_users():
             songs_text = ", ".join(songs)
             bio = random.choice(BIOS)
             pref_gender = random.choice(PREFERRED_GENDERS)
+            # Берём 3 случайные темы из нового списка
+            interests = ", ".join(random.sample(all_topics, min(3, len(all_topics))))
 
             user = User(
                 telegram_id = -i - 1,
@@ -107,6 +118,7 @@ async def seed_users():
                 favorite_songs = songs_text,
                 preferred_gender = pref_gender,
                 bio = bio,
+                interests = interests,
                 photo_file_id = photo_url,
                 is_premium = random.choice([True, False, False, False, False]),
                 created_at = datetime.utcnow()
@@ -115,7 +127,7 @@ async def seed_users():
             if (i + 1) % 10 == 0:
                 print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print(f"Готово! Создано {total} тестовых анкет с портретами людей (пол соответствует фото).")
+    print(f"Готово! Создано {total} тестовых анкет с новыми интересами.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())
