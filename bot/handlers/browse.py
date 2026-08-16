@@ -19,39 +19,13 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
-async def edit_or_caption(callback: CallbackQuery, text: str, reply_markup=None, parse_mode=None):
-    if callback.message.photo:
-        await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    else:
-        await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
-
-async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
-    if isinstance(event, CallbackQuery):
-        user_id = event.from_user.id
-        target_message = event.message
-    else:
-        user_id = event.from_user.id
-        target_message = event
-
-    user = await crud.get_user_by_telegram_id(session, user_id)
-    if not user:
-        await target_message.answer("Зарегистрируйтесь через /start")
-        return
-
-    candidate, score = await pick_candidate_simple(session, user)
-    if not candidate:
-        markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Показать все анкеты", callback_data="show_all")],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
-        ])
-        await target_message.answer(
-            "😕 Больше нет новых анкет.\n\n"
-            "Вы уже просмотрели всех доступных пользователей.\n"
-            "Нажмите «Показать все анкеты», чтобы увидеть тех, кого вы пропустили ранее.",
-            reply_markup=markup
-        )
-        await state.clear()
-        return
+async def send_candidate(target, candidate, score, state: FSMContext, session: AsyncSession, delete_old=True):
+    """Отправляет анкету, удаляя старое сообщение"""
+    if delete_old and hasattr(target, 'delete'):
+        try:
+            await target.delete()
+        except:
+            pass
 
     await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
@@ -62,7 +36,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 
     if view_count % 7 == 0:
         try:
-            await target_message.answer(
+            await target.answer(
                 "🔍 Вы просмотрели 7 анкет! Если заметили баг или есть идея, напишите @danhooks."
             )
         except:
@@ -70,13 +44,45 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 
     text = format_user_card(candidate, score)
     markup = browse_actions_keyboard()
-    try:
-        if candidate.photo_file_id:
-            await target_message.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
-        else:
-            await target_message.answer(text, reply_markup=markup)
-    except Exception as e:
-        await target_message.answer(text, reply_markup=markup)
+    if candidate.photo_file_id:
+        await target.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
+    else:
+        await target.answer(text, reply_markup=markup)
+
+async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
+    if isinstance(event, CallbackQuery):
+        user_id = event.from_user.id
+        target = event.message
+    else:
+        user_id = event.from_user.id
+        target = event
+
+    user = await crud.get_user_by_telegram_id(session, user_id)
+    if not user:
+        await target.answer("Зарегистрируйтесь через /start")
+        return
+
+    candidate, score = await pick_candidate_simple(session, user)
+    if not candidate:
+        # Удаляем старое сообщение и отправляем новое (без фото)
+        try:
+            await target.delete()
+        except:
+            pass
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Показать все анкеты", callback_data="show_all")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ])
+        await target.answer(
+            "😕 Больше нет новых анкет.\n\n"
+            "Вы уже просмотрели всех доступных пользователей.\n"
+            "Нажмите «Показать все анкеты», чтобы увидеть тех, кого вы пропустили ранее.",
+            reply_markup=markup
+        )
+        await state.clear()
+        return
+
+    await send_candidate(target, candidate, score, state, session, delete_old=False)
 
 @router.message(Command("search"))
 async def search_command(message: Message, state: FSMContext, session: AsyncSession):
@@ -188,6 +194,7 @@ async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_envelope")]
     ])
+    # Для конверта используем редактирование, так как это всегда текущее сообщение с фото или текстом.
     if callback.message.photo:
         await callback.message.edit_caption(
             caption="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
@@ -248,17 +255,7 @@ async def show_next_from_message(message: Message, state: FSMContext, session: A
         await message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=main_reply_keyboard())
         await state.clear()
         return
-    await state.set_state(Browse.candidate_id)
-    await state.update_data(candidate_id=candidate.id)
-    text = format_user_card(candidate, score)
-    markup = browse_actions_keyboard()
-    try:
-        if candidate.photo_file_id:
-            await message.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
-        else:
-            await message.answer(text, reply_markup=markup)
-    except Exception as e:
-        await message.answer(text, reply_markup=markup)
+    await send_candidate(message, candidate, score, state, session, delete_old=False)
 
 @router.callback_query(F.data == "report_user", Browse.candidate_id)
 async def report_user(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -268,16 +265,12 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
         await callback.answer("Нет анкеты.")
         return
     await state.update_data(report_target=candidate_id)
-    if callback.message.photo:
-        await callback.message.edit_caption(
-            caption="Выберите причину жалобы:",
-            reply_markup=report_reason_keyboard()
-        )
-    else:
-        await callback.message.edit_text(
-            text="Выберите причину жалобы:",
-            reply_markup=report_reason_keyboard()
-        )
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    markup = report_reason_keyboard()
+    await callback.message.answer("Выберите причину жалобы:", reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
@@ -302,39 +295,17 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
+        try:
+            await callback.message.delete()
+        except:
+            pass
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
-        await edit_or_caption(callback, "Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
+        await callback.message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         await state.clear()
         await callback.answer()
         return
-    await state.set_state(Browse.candidate_id)
-    await state.update_data(candidate_id=candidate.id)
-
-    data = await state.get_data()
-    view_count = data.get("view_count", 0) + 1
-    await state.update_data(view_count=view_count)
-
-    if view_count % 7 == 0:
-        try:
-            await callback.message.answer(
-                "🔍 Вы просмотрели 7 анкет! Если заметили баг или есть идея, напишите @danhooks."
-            )
-        except:
-            pass
-
-    text = format_user_card(candidate, score)
-    markup = browse_actions_keyboard()
-    try:
-        if candidate.photo_file_id:
-            await callback.message.edit_media(
-                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-                reply_markup=markup
-            )
-        else:
-            await edit_or_caption(callback, text, reply_markup=markup)
-    except Exception as e:
-        await edit_or_caption(callback, text, reply_markup=markup)
-    await callback.answer()
+    await callback.message.delete()
+    await send_candidate(callback.message, candidate, score, state, session, delete_old=False)
