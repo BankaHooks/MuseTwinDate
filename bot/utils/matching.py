@@ -8,19 +8,19 @@ from utils.helpers import parse_comma_separated, normalize_goal
 logger = logging.getLogger(__name__)
 
 # Веса для расчёта совпадения (сумма = 1.0)
-WEIGHT_SONGS = 0.30
+WEIGHT_SONGS = 0.35
 WEIGHT_BANDS = 0.25
 WEIGHT_GENRES = 0.20
 WEIGHT_GAMES = 0.10
-WEIGHT_INTERESTS = 0.10
+WEIGHT_INTERESTS = 0.05
 WEIGHT_GOAL = 0.05
 
-def sorensen_similarity(set1: set, set2: set) -> float:
-    """Коэффициент Сёренсена (2*|пересечение| / (|set1|+|set2|))"""
+def overlap_coefficient(set1: set, set2: set) -> float:
+    """Коэффициент перекрытия: |пересечение| / min(|set1|, |set2|)"""
     if not set1 or not set2:
         return 0.0
     intersection = len(set1 & set2)
-    return 2 * intersection / (len(set1) + len(set2))
+    return intersection / min(len(set1), len(set2))
 
 def calculate_match_score(user1: User, user2: User) -> float:
     songs1 = parse_comma_separated(user1.favorite_songs)
@@ -34,11 +34,11 @@ def calculate_match_score(user1: User, user2: User) -> float:
     interests1 = parse_comma_separated(user1.interests)
     interests2 = parse_comma_separated(user2.interests)
 
-    songs_score = sorensen_similarity(songs1, songs2)
-    bands_score = sorensen_similarity(bands1, bands2)
-    genres_score = sorensen_similarity(genres1, genres2)
-    games_score = sorensen_similarity(games1, games2)
-    interests_score = sorensen_similarity(interests1, interests2)
+    songs_score = overlap_coefficient(songs1, songs2)
+    bands_score = overlap_coefficient(bands1, bands2)
+    genres_score = overlap_coefficient(genres1, genres2)
+    games_score = overlap_coefficient(games1, games2)
+    interests_score = overlap_coefficient(interests1, interests2)
 
     goal1 = normalize_goal(user1.search_goal)
     goal2 = normalize_goal(user2.search_goal)
