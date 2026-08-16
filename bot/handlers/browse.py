@@ -111,6 +111,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Лайк поставлен!")
+
+    # Переключаем на следующую анкету
     await show_next(callback, state, session)
 
 @router.callback_query(F.data == "skip", Browse.candidate_id)
