@@ -96,6 +96,7 @@ def profile_edit_keyboard():
         [InlineKeyboardButton(text="Интересы", callback_data="edit_interests"),
          InlineKeyboardButton(text="Био", callback_data="edit_bio")],
         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="Обновить рекомендации", callback_data="refresh_recommendations")],
         [InlineKeyboardButton(text="Перезаполнить анкету заново", callback_data="reset_profile")],
         [InlineKeyboardButton(text="Назад", callback_data="profile_back")]
     ]

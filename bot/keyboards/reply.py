@@ -12,6 +12,7 @@ def main_reply_keyboard():
         ],
         [
             KeyboardButton(text="Премиум-функции"),
+            KeyboardButton(text="Гороскоп"),
         ],
     ]
     return ReplyKeyboardMarkup(

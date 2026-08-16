@@ -15,6 +15,8 @@ from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
 from utils.media import save_photo
 from utils.security import escape_markdown
+from utils.vk_api import enrich_profile_with_vk
+from config import config
 
 router = Router()
 
@@ -221,6 +223,8 @@ async def edit_bands(message: Message, state: FSMContext, session: AsyncSession)
         bands = truncate_field(bands, 500)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, favorite_bands=bands)
+    if config.VK_ACCESS_TOKEN:
+        await enrich_profile_with_vk(user, session, config.VK_ACCESS_TOKEN)
     await state.clear()
     await message.answer("Группы обновлены", reply_markup=main_reply_keyboard())
 
@@ -373,3 +377,26 @@ async def edit_photo(message: Message, state: FSMContext, session: AsyncSession)
             return
     await state.clear()
     await message.answer("Фото обновлено", reply_markup=main_reply_keyboard())
+
+@router.callback_query(F.data == "refresh_recommendations")
+async def refresh_recommendations(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+    if not config.VK_ACCESS_TOKEN:
+        await callback.answer("Функция временно недоступна.", show_alert=True)
+        return
+    if not user.favorite_bands:
+        await callback.answer("У вас нет любимых групп.", show_alert=True)
+        return
+    await callback.message.edit_text("Ищем рекомендации...")
+    similar = await enrich_profile_with_vk(user, session, config.VK_ACCESS_TOKEN)
+    if similar:
+        await callback.message.edit_text(
+            f"Рекомендуем добавить: {', '.join(similar)}\nОбновлено в профиле.",
+            reply_markup=profile_edit_keyboard()
+        )
+    else:
+        await callback.message.edit_text("Не удалось найти рекомендации.")
+    await callback.answer()

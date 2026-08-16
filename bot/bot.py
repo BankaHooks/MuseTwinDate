@@ -13,7 +13,7 @@ from config import config
 from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
-from handlers import start, menu, browse, likes, profile, premium, report, admin, ai
+from handlers import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -129,6 +129,7 @@ async def main():
         report.router,
         admin.router,
         ai.router,
+        horoscope.router,
     )
     await on_startup()
     asyncio.create_task(inactivity_notifier())
