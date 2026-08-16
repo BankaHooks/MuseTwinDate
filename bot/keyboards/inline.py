@@ -158,8 +158,9 @@ def browse_actions_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Скип", callback_data="skip"),
          InlineKeyboardButton(text="Лайк", callback_data="like")],
-        [InlineKeyboardButton(text="Профиль", callback_data="view_profile"),
-         InlineKeyboardButton(text="Пожаловаться", callback_data="report_user")],
+        [InlineKeyboardButton(text="✉️ Конверт", callback_data="send_envelope"),
+         InlineKeyboardButton(text="Профиль", callback_data="view_profile")],
+        [InlineKeyboardButton(text="Пожаловаться", callback_data="report_user")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

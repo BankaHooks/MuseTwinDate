@@ -79,7 +79,11 @@ async def ai_match(callback: CallbackQuery, session: AsyncSession):
     if not pool:
         await callback.message.edit_text("Нет кандидатов для подбора.")
         return
-    result = await get_match_recommendation(user, pool)
+    try:
+        result = await get_match_recommendation(user, pool)
+    except Exception as e:
+        await callback.message.edit_text(f"Ошибка AI: {e}. Попробуйте позже.")
+        return
     if result["user"]:
         candidate = result["user"]
         text = f"🎯 AI рекомендует:\n\nИмя: {candidate.name or 'Без имени'}\n"
@@ -126,6 +130,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     else:
         song = random.choice(POPULAR_SONGS)
     questions = await generate_blind_date_questions(song, user, partner)
+    if not questions:
+        questions = ["Что тебе больше всего нравится в этой песне?", "Какие эмоции она у тебя вызывает?", "С каким моментом жизни она ассоциируется?"]
     safe_song = escape_markdown(song)
     partner_name = escape_markdown(partner.name or "партнёром")
     safe_questions = [escape_markdown(q) for q in questions]
@@ -140,7 +146,16 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         text += f"{i}. {q}\n"
     text += f"\nНапишите партнёру: {partner_link}\n"
     text += "Обсудите трек и поделитесь впечатлениями!"
-    await callback.message.edit_text(text, reply_markup=premium_features_keyboard(), parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=premium_features_keyboard(), parse_mode="Markdown")
+    except Exception as e:
+        await callback.message.edit_text(
+            f"🌹 Свидание вслепую с {partner_name}!\n\n"
+            f"🎵 Общий трек: {safe_song}\n\n"
+            "Обсудите его с партнёром.\n"
+            f"Напишите партнёру: {partner_link}",
+            reply_markup=premium_features_keyboard()
+        )
     await callback.answer()
 
 @router.callback_query(F.data == "reset_history")

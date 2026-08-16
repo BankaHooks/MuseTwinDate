@@ -98,8 +98,10 @@ async def admin_users_list(callback: CallbackQuery, session: AsyncSession):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("Нет прав")
         return
-    _, gender, page_str = callback.data.split("_")
-    page = int(page_str)
+    parts = callback.data.split("_")
+    # admin_users_list_all_0 -> parts = ['admin', 'users', 'list', 'all', '0']
+    gender = parts[3]
+    page = int(parts[4])
     limit = 10
     offset = page * limit
     stmt = select(User).order_by(User.id)

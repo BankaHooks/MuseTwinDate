@@ -1049,7 +1049,18 @@ async def get_match_recommendation(user: User, candidates: List[User]) -> Dict[s
             max_tokens=150
         )
         response = await client.achat(payload)
-        data = json.loads(response.choices[0].message.content.strip())
+        content = response.choices[0].message.content.strip()
+        # Попытка извлечь JSON из ответа
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            # Попробуем найти JSON внутри текста
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                raise ValueError("No JSON found in response")
         idx = data.get("best_index", 1) - 1
         if 0 <= idx < len(top_candidates):
             return {"user": top_candidates[idx], "explanation": data.get("explanation", "Совпадение на основе музыкальных предпочтений.")}
@@ -1057,7 +1068,7 @@ async def get_match_recommendation(user: User, candidates: List[User]) -> Dict[s
             return {"user": None, "explanation": "Не удалось выбрать."}
     except Exception as e:
         logger.error(f"AI match recommendation failed: {e}")
-        return {"user": None, "explanation": "Ошибка AI. Попробуй позже."}
+        return {"user": None, "explanation": "Ошибка AI. Попробуйте позже."}
 
 async def generate_blind_date_questions(song: str, user1: User, user2: User) -> List[str]:
     prompt = (

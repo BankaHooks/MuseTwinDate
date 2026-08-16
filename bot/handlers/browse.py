@@ -14,6 +14,7 @@ from states.report import ReportState
 from utils.helpers import format_user_card
 from utils.matching import pick_candidate_simple
 from utils.security import escape_markdown
+from states.envelope import EnvelopeState
 
 router = Router()
 
@@ -290,3 +291,39 @@ async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: As
     except Exception as e:
         await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
+
+@router.callback_query(F.data == "send_envelope", Browse.candidate_id)
+async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    candidate_id = data.get("candidate_id")
+    if not candidate_id:
+        await callback.answer("Нет анкеты.")
+        return
+    await state.update_data(envelope_target=candidate_id)
+    await state.set_state(EnvelopeState.text)
+    await callback.message.answer("Введите текст сообщения (конверта), которое будет отправлено этому пользователю анонимно:")
+    await callback.answer()
+
+@router.message(EnvelopeState.text)
+async def send_envelope_text(message: Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    target_id = data.get("envelope_target")
+    if not target_id:
+        await message.answer("Ошибка: цель не найдена.")
+        await state.clear()
+        return
+    target = await crud.get_user_by_id(session, target_id)
+    if not target:
+        await message.answer("Пользователь не найден.")
+        await state.clear()
+        return
+    text = message.text
+    await message.answer("Конверт отправлен!")
+    try:
+        await message.bot.send_message(
+            target.telegram_id,
+            f"📩 Вам пришло анонимное сообщение:\n\n{text}"
+        )
+    except Exception as e:
+        await message.answer("Не удалось отправить конверт. Возможно, пользователь заблокировал бота.")
+    await state.clear()
