@@ -1,4 +1,4 @@
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -71,7 +71,7 @@ async def get_like_between(session: AsyncSession, user1_id: int, user2_id: int) 
     return result.scalars().first()
 
 async def create_skip(session: AsyncSession, user_id: int, skipped_user_id: int):
-    skip = Skip(user_id=user_id, skipped_user_id=skipped_user_id)
+    skip = Skip(user_id=user_id, skipped_user_id=skipped_user_id, created_at=datetime.utcnow())
     session.add(skip)
     await session.commit()
 
@@ -124,8 +124,15 @@ async def record_payment(session: AsyncSession, user_id: int, charge_id: str, am
     await session.commit()
     return payment
 
+async def delete_old_skips(session: AsyncSession, user_id: int, days: int = 1):
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    await session.execute(delete(Skip).where(and_(Skip.user_id == user_id, Skip.created_at < cutoff)))
+    await session.commit()
+
 async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit: int = 300) -> List[User]:
     current_user = await get_user_by_id(session, current_user_id)
+    await delete_old_skips(session, current_user_id, days=1)
+
     skipped = await get_skipped_user_ids(session, current_user_id)
     blocked_by_me = await get_blocked_user_ids(session, current_user_id)
     blocked_me = await get_blockers_for_user(session, current_user_id)

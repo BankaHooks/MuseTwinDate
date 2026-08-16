@@ -2,10 +2,11 @@ from typing import Union
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from database.crud import get_likes_count
+from database.models import Skip
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
@@ -14,16 +15,26 @@ from utils.matching import pick_candidate_simple
 
 router = Router()
 
-async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
+async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, reset_skips: bool = False):
     user_id = event.from_user.id
     user = await crud.get_user_by_telegram_id(session, user_id)
     if not user:
         await event.answer("Зарегистрируйтесь через /start")
         return
+
+    if reset_skips:
+        await session.execute(delete(Skip).where(Skip.user_id == user.id))
+        await session.commit()
+
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
-        await event.answer("Нет больше анкет для показа.", reply_markup=main_reply_keyboard())
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ])
+        await event.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         return
+
     await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
     text = format_user_card(candidate, score)
@@ -41,6 +52,12 @@ async def search_command(message: Message, state: FSMContext, session: AsyncSess
 async def browse_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     await callback.message.delete()
     await show_candidate(callback.message, state, session)
+    await callback.answer()
+
+@router.callback_query(F.data == "show_all")
+async def show_all_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await callback.message.delete()
+    await show_candidate(callback.message, state, session, reset_skips=True)
     await callback.answer()
 
 @router.callback_query(F.data == "like", Browse.candidate_id)
@@ -62,16 +79,16 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
     like = await crud.create_like(session, user.id, candidate.id)
     await crud.increment_likes(session, user)
 
-    # Уведомление о количестве лайков для цели
-    total_likes = await get_likes_count(session, candidate.id)
+    total_likes = await crud.get_likes_count(session, candidate.id)
     if total_likes > candidate.last_like_notification_count:
         count = total_likes
+        display_count = "9+" if count > 9 else str(count)
         if count == 1:
             text = "Вас лайкнул 1 человек."
-        elif count in (2, 3, 4):
-            text = f"Вас лайкнули {count} человека."
+        elif 2 <= count <= 4:
+            text = f"Вас лайкнули {display_count} человека."
         else:
-            text = f"Вас лайкнули {count} человек."
+            text = f"Вас лайкнули {display_count} человек."
         await callback.bot.send_message(candidate.telegram_id, text)
         candidate.last_like_notification_count = count
         await session.commit()
@@ -143,7 +160,11 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
-        await callback.message.edit_text("Нет больше анкет.", reply_markup=main_reply_keyboard())
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ])
+        await callback.message.edit_text("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         await state.clear()
         await callback.answer()
         return
