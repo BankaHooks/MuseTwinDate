@@ -2,18 +2,18 @@ import os
 import json
 import logging
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+from gigachat import GigaChat
+from gigachat.models import Chat, Messages, MessageRole
 from database.models import User
+from config import config
 
 logger = logging.getLogger(__name__)
 
-client = AsyncOpenAI(
-    base_url="https://integrate.api.nvidia.com/v1",
-    api_key=os.getenv("NVIDIA_API_KEY"),
-    timeout=30.0
+client = GigaChat(
+    credentials=config.GIGACHAT_API_KEY,
+    verify_ssl_certs=False,
+    model=config.GIGACHAT_MODEL
 )
-
-MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
 
 async def generate_icebreakers(user1: User, user2: User) -> List[str]:
     prompt = (
@@ -28,12 +28,12 @@ async def generate_icebreakers(user1: User, user2: User) -> List[str]:
         "Верни только список фраз, каждая с новой строки, без нумерации."
     )
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+        payload = Chat(
+            messages=[Messages(role=MessageRole.USER, content=prompt)],
             temperature=0.8,
             max_tokens=200
         )
+        response = await client.achat(payload)
         text = response.choices[0].message.content.strip()
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         return lines[:5]
@@ -51,12 +51,12 @@ async def analyze_music_taste(user: User) -> str:
         "Будь дружелюбным и интересным."
     )
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+        payload = Chat(
+            messages=[Messages(role=MessageRole.USER, content=prompt)],
             temperature=0.7,
             max_tokens=120
         )
+        response = await client.achat(payload)
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"AI music analysis failed: {e}")
@@ -85,13 +85,12 @@ async def get_match_recommendation(user: User, candidates: List[User]) -> Dict[s
         "Верни только JSON."
     )
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+        payload = Chat(
+            messages=[Messages(role=MessageRole.USER, content=prompt)],
             temperature=0.5,
-            max_tokens=150,
-            response_format={"type": "json_object"}
+            max_tokens=150
         )
+        response = await client.achat(payload)
         data = json.loads(response.choices[0].message.content.strip())
         idx = data.get("best_index", 1) - 1
         if 0 <= idx < len(top_candidates):
@@ -112,12 +111,12 @@ async def generate_blind_date_questions(song: str, user1: User, user2: User) -> 
         "Верни только список вопросов, каждый с новой строки, без нумерации."
     )
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+        payload = Chat(
+            messages=[Messages(role=MessageRole.USER, content=prompt)],
             temperature=0.8,
             max_tokens=150
         )
+        response = await client.achat(payload)
         text = response.choices[0].message.content.strip()
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         return lines[:3]
