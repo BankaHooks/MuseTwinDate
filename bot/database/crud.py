@@ -34,11 +34,9 @@ async def create_like(session: AsyncSession, from_user_id: int, to_user_id: int)
     existing = existing.scalar_one_or_none()
     if existing:
         return existing
-
     like = Like(from_user_id=from_user_id, to_user_id=to_user_id)
     session.add(like)
     await session.commit()
-
     other = await session.execute(
         select(Like).where(and_(Like.from_user_id == to_user_id, Like.to_user_id == from_user_id))
     )
@@ -55,7 +53,7 @@ async def create_like(session: AsyncSession, from_user_id: int, to_user_id: int)
 
 async def get_likes_received(session: AsyncSession, user_id: int) -> List[Like]:
     result = await session.execute(
-        select(Like).where(Like.to_user_id == user_id).order_by(Like.created_at.desc())
+        select(Like).where(and_(Like.to_user_id == user_id, Like.is_mutual == False)).order_by(Like.created_at.desc())
     )
     return result.scalars().all()
 
@@ -132,7 +130,6 @@ async def delete_old_skips(session: AsyncSession, user_id: int, days: int = 1):
 async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit: int = 300) -> List[User]:
     current_user = await get_user_by_id(session, current_user_id)
     await delete_old_skips(session, current_user_id, days=1)
-
     skipped = await get_skipped_user_ids(session, current_user_id)
     blocked_by_me = await get_blocked_user_ids(session, current_user_id)
     blocked_me = await get_blockers_for_user(session, current_user_id)
@@ -141,7 +138,6 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     )
     liked_ids = likes_from_me.scalars().all()
     exclude = set([current_user_id] + skipped + blocked_by_me + blocked_me + liked_ids)
-
     stmt = select(User).where(
         and_(
             User.id.notin_(exclude),
@@ -195,26 +191,3 @@ async def update_like_notification_count(session: AsyncSession, user: User, coun
 async def update_last_activity(session: AsyncSession, user: User):
     user.last_activity = datetime.utcnow()
     await session.commit()
-
-from sqlalchemy import func
-
-async def get_random_bot(session: AsyncSession, exclude_user_ids: list = None) -> Optional[User]:
-    stmt = select(User).where(
-        User.telegram_id < 0,
-        User.is_banned == False,
-        User.is_hidden == False
-    )
-    if exclude_user_ids:
-        stmt = stmt.where(User.id.notin_(exclude_user_ids))
-    stmt = stmt.order_by(func.random()).limit(1)
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
-
-async def get_random_real_user(session: AsyncSession) -> Optional[User]:
-    stmt = select(User).where(
-        User.telegram_id > 0,
-        User.is_banned == False
-    )
-    stmt = stmt.order_by(func.random()).limit(1)
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
