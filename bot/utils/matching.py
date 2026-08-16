@@ -8,12 +8,12 @@ from utils.helpers import parse_comma_separated, normalize_goal
 logger = logging.getLogger(__name__)
 
 # Веса для расчёта совпадения (сумма = 1.0)
-WEIGHT_SONGS = 0.35
+WEIGHT_SONGS = 0.30
 WEIGHT_BANDS = 0.20
-WEIGHT_GENRES = 0.20
+WEIGHT_GENRES = 0.15
 WEIGHT_GAMES = 0.15
-WEIGHT_INTERESTS = 0.05
-WEIGHT_GOAL = 0.05
+WEIGHT_INTERESTS = 0.10
+WEIGHT_GOAL = 0.10
 
 def jaccard_similarity(set1: set, set2: set) -> float:
     if not set1 or not set2:
