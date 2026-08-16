@@ -1,9 +1,9 @@
 import asyncio
 import random
 from datetime import datetime
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select, delete
 from config import config
 from database.models import User, Base
 
@@ -63,10 +63,18 @@ async def seed_users():
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        # Удаляем старых тестовых пользователей (telegram_id < 0)
-        await session.execute(delete(User).where(User.telegram_id < 0))
-        await session.commit()
-        print("Старые тестовые пользователи удалены.")
+        existing = await session.execute(select(User).where(User.telegram_id < 0))
+        existing_count = len(existing.scalars().all())
+        if existing_count > 0:
+            print(f"В базе уже есть {existing_count} тестовых анкет.")
+            answer = input("Удалить их и создать заново? (y/n): ")
+            if answer.lower() == 'y':
+                await session.execute(delete(User).where(User.telegram_id < 0))
+                await session.commit()
+                print("Старые анкеты удалены.")
+            else:
+                print("Создание новых анкет отменено.")
+                return
 
         total = 300
         for i in range(total):
@@ -80,7 +88,9 @@ async def seed_users():
             bio = random.choice(BIOS)
             gender = random.choice(["Мужской", "Женский"])
             pref_gender = random.choice(PREFERRED_GENDERS)
-            photo_url = f"https://picsum.photos/seed/{i+100}/300/400"
+            # Генерация портрета человека через pravatar.cc
+            photo_id = random.randint(1, 70)
+            photo_url = f"https://i.pravatar.cc/300?img={photo_id}"
 
             user = User(
                 telegram_id = -i - 1,
@@ -102,7 +112,7 @@ async def seed_users():
             if (i + 1) % 50 == 0:
                 print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print(f"Готово! Создано {total} тестовых анкет с фото.")
+    print(f"Готово! Создано {total} тестовых анкет с портретами людей.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())
