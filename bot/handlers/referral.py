@@ -26,7 +26,10 @@ async def show_referral(callback: CallbackQuery, session: AsyncSession):
         [InlineKeyboardButton(text="📋 Скопировать ссылку", callback_data="copy_referral")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="profile_back")]
     ])
-    await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=markup, parse_mode="Markdown")
+    else:
+        await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
     await callback.answer()
 
 @router.callback_query(F.data == "copy_referral")
