@@ -1,134 +1,132 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, SuccessfulPayment
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta
 from database import crud
-from keyboards.reply import main_reply_keyboard
-from utils.payments import PLANS, create_invoice_payload, get_premium_expiry
 from config import config
-from keyboards.inline import (
-    premium_payment_methods_keyboard,
-    premium_stars_plans_keyboard,
-    premium_rub_plans_keyboard,
-    main_menu_keyboard
-)
+from keyboards.inline import premium_payment_methods_keyboard, premium_stars_plans_keyboard, premium_rub_plans_keyboard, premium_features_keyboard
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 
-async def show_premium_menu(target, user_id: int, session: AsyncSession, delete_old: bool = False):
-    user = await crud.get_user_by_telegram_id(session, user_id)
-    if not user:
-        await target.answer("Зарегистрируйтесь через /start")
-        return
-    status = "Активен" if user.is_premium else "Неактивен"
-    expiry = f" (до {user.premium_expiry.strftime('%Y-%m-%d')})" if user.premium_expiry else ""
-    text = f"⭐ Премиум: {status}{expiry}\n\nВыберите способ оплаты:"
-    if delete_old:
-        await target.delete()
-    await target.answer(text, reply_markup=premium_payment_methods_keyboard())
-
 @router.callback_query(F.data == "premium")
-async def premium_show(callback: CallbackQuery, session: AsyncSession):
-    await show_premium_menu(callback.message, callback.from_user.id, session, delete_old=True)
-    await callback.answer()
-
-async def show_premium_for_message(message: Message, session: AsyncSession):
-    await show_premium_menu(message, message.from_user.id, session, delete_old=False)
-
-@router.callback_query(F.data == "premium_back")
-async def premium_back(callback: CallbackQuery, session: AsyncSession):
-    await show_premium_menu(callback.message, callback.from_user.id, session, delete_old=False)
-    await callback.answer()
-
-@router.callback_query(F.data == "premium_stars")
-async def premium_stars_method(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "Выберите тариф в звёздах:",
-        reply_markup=premium_stars_plans_keyboard()
-    )
-    await callback.answer()
-
-@router.callback_query(F.data == "premium_card")
-async def premium_card_method(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "Выберите тариф в рублях (оплата картой / СБП):",
-        reply_markup=premium_rub_plans_keyboard()
-    )
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("premium_stars_"))
-async def premium_stars_plan(callback: CallbackQuery, session: AsyncSession):
-    plan_key = callback.data.split("_")[2]
-    if plan_key not in ["1", "3"]:
-        await callback.answer("Неверный план.")
-        return
-    plan = PLANS.get(plan_key)
-    if not plan:
-        await callback.answer("Неверный план.")
-        return
+async def premium_menu(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
         await callback.answer("Зарегистрируйтесь через /start")
         return
-    payload = create_invoice_payload(plan_key, user.id)
-    prices = [LabeledPrice(label=plan["label"], amount=plan["price"])]
+    text = "💎 Премиум-подписка\n\n"
+    if user.is_premium and user.premium_expiry and user.premium_expiry > datetime.utcnow():
+        text += f"У вас активна подписка до {user.premium_expiry.strftime('%d.%m.%Y %H:%M')}."
+    else:
+        text += "Выберите способ оплаты:"
+    await callback.message.edit_text(text, reply_markup=premium_payment_methods_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "premium_stars")
+async def premium_stars(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь")
+        return
+    await callback.message.edit_text("Выберите тариф (оплата звёздами):", reply_markup=premium_stars_plans_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "premium_card")
+async def premium_card(callback: CallbackQuery):
+    await callback.message.edit_text("💳 Оплата картой / СБП временно недоступна. Ведутся технические работы.")
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("premium_stars_"))
+async def premium_stars_plan(callback: CallbackQuery, session: AsyncSession):
+    plan = callback.data.split("_")[2]
+    months = int(plan)
+    star_prices = {1: 100, 3: 250}
+    price_in_stars = star_prices.get(months, 100)
+    base_price_rub = 150 if months == 1 else 350
+
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Ошибка")
+        return
+
+    final_price_rub = await crud.apply_referral_discount(session, user.id, base_price_rub)
+    discount = user.referral_discount or 0
+
+    text = f"Тариф на {months} месяц(ев) – {price_in_stars} ⭐\n"
+    if discount > 0:
+        text += f"Ваша скидка: {discount}% (без скидки: {base_price_rub} ₽, со скидкой: {final_price_rub} ₽)\n"
+    text += "\nНажмите «Оплатить» для продолжения."
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⭐ Оплатить", callback_data=f"stars_pay_{months}")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="premium_stars")]
+    ])
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("stars_pay_"))
+async def stars_pay(callback: CallbackQuery, session: AsyncSession):
+    months = int(callback.data.split("_")[2])
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Ошибка")
+        return
+    star_prices = {1: 100, 3: 250}
+    price_in_stars = star_prices.get(months, 100)
+    prices = [LabeledPrice(label="Премиум", amount=price_in_stars)]
     try:
         await callback.bot.send_invoice(
             chat_id=callback.from_user.id,
-            title="MuseTwinDate Premium",
-            description=f"Premium подписка на {plan['label']}",
-            payload=payload,
-            provider_token=config.PAYMENT_PROVIDER_TOKEN,
+            title="Премиум-подписка MuseTwin",
+            description=f"Доступ к премиум-функциям на {months} месяц(ев)",
+            payload=f"premium_{months}_{user.id}",
+            provider_token="",
             currency="XTR",
             prices=prices,
-            start_parameter="premium",
+            start_parameter="premium_subscription",
+            need_name=False,
+            need_email=False,
+            need_phone_number=False,
         )
-        await callback.answer()
     except Exception as e:
-        await callback.answer("Ошибка при создании счёта. Попробуйте позже.", show_alert=True)
-        print(f"Invoice error: {e}")
-
-@router.callback_query(F.data.startswith("premium_rub_"))
-async def premium_rub_plan(callback: CallbackQuery):
-    plan_key = callback.data.split("_")[2]
-    if plan_key == "1":
-        price = "150 ₽"
-        plan_desc = "1 месяц"
-    elif plan_key == "3":
-        price = "350 ₽"
-        plan_desc = "3 месяца"
-    else:
-        await callback.answer("Неверный план.")
-        return
-    await callback.answer(
-        f"Оплата картой временно недоступна.\n"
-        f"Вы выбрали тариф: {plan_desc} за {price}.\n"
-        f"Пожалуйста, используйте оплату звёздами.",
-        show_alert=True
-    )
-    await callback.message.edit_text(
-        "Оплата картой временно недоступна.\n"
-        "Выберите оплату через Telegram Stars.",
-        reply_markup=premium_stars_plans_keyboard()
-    )
+        logger.error(f"Stars invoice error: {e}")
+        await callback.message.edit_text("Ошибка при создании счёта. Попробуйте позже.")
+    await callback.answer()
 
 @router.pre_checkout_query()
-async def pre_checkout(pre_checkout: PreCheckoutQuery):
-    await pre_checkout.answer(ok=True)
+async def pre_checkout(query: PreCheckoutQuery):
+    await query.answer(ok=True)
 
 @router.message(F.successful_payment)
 async def successful_payment(message: Message, session: AsyncSession):
     payment = message.successful_payment
-    parts = payment.invoice_payload.split("_")
-    if len(parts) >= 3 and parts[0] == "premium":
-        plan_key = parts[1]
+    payload = payment.invoice_payload
+    parts = payload.split("_")
+    if len(parts) >= 3:
+        months = int(parts[1])
         user_id = int(parts[2])
-        plan = PLANS.get(plan_key)
-        if plan:
-            expiry = get_premium_expiry(plan["months"])
-            await crud.record_payment(session, user_id, payment.telegram_payment_charge_id,
-                                      payment.total_amount, plan["months"], expiry)
-            await crud.set_premium(session, user_id, plan["months"])
-            await message.answer("Премиум активирован! Спасибо.", reply_markup=main_reply_keyboard())
-            return
-    await message.answer("Платёж записан, но что-то пошло не так. Обратитесь в поддержку.")
+        user = await crud.get_user_by_id(session, user_id)
+        if user:
+            await crud.set_premium(session, user_id, months)
+            await crud.record_payment(
+                session, user_id, payment.telegram_payment_charge_id,
+                payment.total_amount, months,
+                datetime.utcnow() + timedelta(days=30*months)
+            )
+            await message.answer(f"🎉 Премиум активирован на {months} месяц(ев)!")
+            for admin_id in config.ADMIN_IDS:
+                try:
+                    await message.bot.send_message(admin_id, f"💰 Покупка премиум: {user.name or user.username} на {months} мес.")
+                except:
+                    pass
+        else:
+            await message.answer("Ошибка активации. Обратитесь к @danhooks.")
+    else:
+        await message.answer("Ошибка оплаты.")
+
+@router.callback_query(F.data == "premium_back")
+async def premium_back(callback: CallbackQuery, session: AsyncSession):
+    await premium_menu(callback, session)

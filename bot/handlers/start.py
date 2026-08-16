@@ -1,266 +1,278 @@
 from aiogram import Router, F
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, ContentType
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from states.registration import Registration
-from keyboards.inline import (
-    genre_choose_keyboard, gender_choose_keyboard, preferred_gender_keyboard,
-    goal_keyboard, interest_category_keyboard, interest_items_keyboard, welcome_keyboard
-)
+from database.models import User
+from keyboards.inline import welcome_keyboard, main_menu_keyboard, gender_choose_keyboard, genre_choose_keyboard, goal_keyboard, interest_category_keyboard, interest_items_keyboard
 from keyboards.reply import main_reply_keyboard
-from utils.helpers import validate_age, normalize_city
-from utils.media import save_photo
+from states.registration import RegistrationState
+from states.profile_edit import ProfileEditState
+from utils.helpers import validate_age, normalize_city, validate_text_length
+from utils.security import escape_markdown
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 
-WELCOME_TEXT = (
-    "Поздравляю, вы попали на запуск MuseTwinDate!\n\n"
-    "Понимаем, что по началу трудно будет найти людей, но если вам интересна идея проекта, "
-    "то, пожалуйста, не бросайте его и старайтесь иногда проверять не появились ли анкеты.\n\n"
-    "А также в честь того, что вы участник первой 1000 пользователей, вы можете получить "
-    "премиум статус, который с каждым обновлением будет давать всё больше функций — "
-    "для этого напишите в лс @danhooks"
-)
-
-def truncate_field(text: str, max_len: int = 500) -> str:
-    if not text:
-        return text
-    if len(text) > max_len:
-        return text[:max_len].strip()
-    return text
-
-@router.message(Command("start"))
+@router.message(CommandStart())
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
+    args = message.text.split()
+    ref_code = None
+    if len(args) > 1 and args[1].startswith("ref_"):
+        ref_code = args[1]
+
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     if user:
+        await message.answer("Вы уже зарегистрированы. Используйте меню.", reply_markup=main_reply_keyboard())
         await state.clear()
-        await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_reply_keyboard())
         return
-    await state.set_state("welcome")
-    await message.answer(WELCOME_TEXT, reply_markup=welcome_keyboard())
 
-@router.callback_query(F.data == "welcome_start", StateFilter("welcome"))
-async def welcome_start_registration(callback: CallbackQuery, state: FSMContext):
-    await callback.message.delete()
-    await state.clear()
-    await state.set_state(Registration.name)
-    await callback.message.answer("Давайте зарегистрируемся!\nКак вас зовут? (можно пропустить, отправив 'Пропустить')")
-    await callback.answer()
+    await state.update_data(ref_code=ref_code)
+    await state.set_state(RegistrationState.name)
+    await message.answer("Добро пожаловать в MuseTwin – знакомства по музыке!\n\nДавайте познакомимся. Как вас зовут?")
 
-@router.message(Registration.name)
-async def reg_name(message: Message, state: FSMContext):
-    raw = message.text
-    if raw.lower() == "пропустить":
-        name = None
-    else:
-        name = truncate_field(raw, 100)
+@router.message(RegistrationState.name)
+async def process_name(message: Message, state: FSMContext):
+    name = message.text.strip()
+    if not name:
+        await message.answer("Имя не может быть пустым. Напишите, как вас зовут.")
+        return
+    if len(name) > 100:
+        await message.answer("Имя слишком длинное (максимум 100 символов).")
+        return
     await state.update_data(name=name)
-    await state.set_state(Registration.gender)
-    await message.answer("Укажите ваш пол:", reply_markup=gender_choose_keyboard())
+    await state.set_state(RegistrationState.gender)
+    await message.answer("Выберите ваш пол:", reply_markup=gender_choose_keyboard())
 
-@router.callback_query(StateFilter(Registration.gender), F.data.startswith("gender_"))
-async def reg_gender(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data.startswith("gender_"), RegistrationState.gender)
+async def process_gender(callback: CallbackQuery, state: FSMContext):
     gender = callback.data.split("_")[1]
     await state.update_data(gender=gender)
-    await state.set_state(Registration.age)
-    await callback.message.edit_text("Сколько вам лет? (18-99)")
+    await state.set_state(RegistrationState.age)
+    await callback.message.delete()
+    await callback.message.answer("Сколько вам лет? (от 18 до 99)")
     await callback.answer()
 
-@router.message(Registration.age)
-async def reg_age(message: Message, state: FSMContext):
-    if not validate_age(message.text):
-        await message.answer("Пожалуйста, введите возраст от 18 до 99.")
+@router.message(RegistrationState.age)
+async def process_age(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Введите число.")
         return
-    await state.update_data(age=int(message.text))
-    await state.set_state(Registration.city)
-    await message.answer("В каком городе вы живёте?")
+    age = int(message.text)
+    if not validate_age(age):
+        await message.answer("Возраст должен быть от 18 до 99 лет.")
+        return
+    await state.update_data(age=age)
+    await state.set_state(RegistrationState.city)
+    await message.answer("Введите ваш город:")
 
-@router.message(Registration.city)
-async def reg_city(message: Message, state: FSMContext):
-    city = normalize_city(message.text)
+@router.message(RegistrationState.city)
+async def process_city(message: Message, state: FSMContext):
+    city = message.text.strip()
+    if not city:
+        await message.answer("Город не может быть пустым.")
+        return
+    city = normalize_city(city)
     await state.update_data(city=city)
-    await state.set_state(Registration.genres)
-    await message.answer("Выберите ваши любимые жанры (можно несколько):", reply_markup=genre_choose_keyboard())
+    await state.set_state(RegistrationState.genres)
+    await message.answer("Выберите ваши любимые музыкальные жанры (можно несколько, нажимайте на них, затем кнопка «Готово»):", reply_markup=genre_choose_keyboard())
 
-@router.callback_query(StateFilter(Registration.genres), F.data.startswith("genre_add_"))
-async def reg_add_genre(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data.startswith("genre_add_"), RegistrationState.genres)
+async def process_genre_add(callback: CallbackQuery, state: FSMContext):
     genre = callback.data.split("_")[2]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
         genres.append(genre)
-    await state.update_data(genres=genres)
-    await callback.answer(f"Добавлен жанр: {genre}")
+        await state.update_data(genres=genres)
+        await callback.answer(f"Добавлено: {genre}")
+    else:
+        await callback.answer("Уже добавлено")
 
-@router.callback_query(StateFilter(Registration.genres), F.data == "genres_done")
-async def reg_genres_done(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "genres_done", RegistrationState.genres)
+async def process_genres_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     genres = data.get("genres", [])
     if not genres:
-        await callback.answer("Выберите хотя бы один жанр.", show_alert=True)
+        await callback.answer("Выберите хотя бы один жанр!", show_alert=True)
         return
-    joined = ", ".join(genres)
-    await state.update_data(genres=truncate_field(joined, 500))
-    await state.set_state(Registration.bands)
-    await callback.message.edit_text("Введите ваши любимые группы (до 5, разделённых запятой):\n(или 'Пропустить')")
+    await state.update_data(genres=", ".join(genres))
+    await state.set_state(RegistrationState.bands)
+    await callback.message.delete()
+    await callback.message.answer("Напишите ваши любимые музыкальные группы (до 5, через запятую):")
     await callback.answer()
 
-@router.message(Registration.bands)
-async def reg_bands(message: Message, state: FSMContext):
-    bands_text = message.text.strip()
-    if bands_text.lower() == "пропустить":
-        await state.update_data(bands=None)
-    else:
-        bands = [b.strip() for b in bands_text.split(",") if b.strip()]
-        if len(bands) > 5:
-            await message.answer("Можно ввести не более 5 групп. Попробуйте снова или отправьте 'Пропустить'.")
+@router.message(RegistrationState.bands)
+async def process_bands(message: Message, state: FSMContext):
+    bands = message.text.strip()
+    if bands:
+        band_list = [b.strip() for b in bands.split(",") if b.strip()]
+        if len(band_list) > 5:
+            await message.answer("Не более 5 групп. Напишите снова.")
             return
-        joined = ", ".join(bands)
-        await state.update_data(bands=truncate_field(joined, 500))
-    await state.set_state(Registration.songs)
-    await message.answer("Введите ваши любимые песни (можно несколько, через запятую):\n(или 'Пропустить')")
+        await state.update_data(bands=", ".join(band_list[:5]))
+    else:
+        await state.update_data(bands="")
+    await state.set_state(RegistrationState.songs)
+    await message.answer("Напишите ваши любимые песни (до 500 символов):")
 
-@router.message(Registration.songs)
-async def reg_songs(message: Message, state: FSMContext):
-    songs = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
+@router.message(RegistrationState.songs)
+async def process_songs(message: Message, state: FSMContext):
+    songs = message.text.strip()
+    if songs and len(songs) > 500:
+        await message.answer("Слишком длинный текст (максимум 500 символов).")
+        return
     await state.update_data(songs=songs)
-    await state.set_state(Registration.goal)
-    await message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
+    await state.set_state(RegistrationState.goal)
+    await message.answer("Выберите цель знакомства:", reply_markup=goal_keyboard())
 
-@router.callback_query(StateFilter(Registration.goal), F.data.startswith("goal_"))
-async def reg_goal(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data.startswith("goal_"), RegistrationState.goal)
+async def process_goal(callback: CallbackQuery, state: FSMContext):
     goal = callback.data.split("_")[1]
-    await state.update_data(goal=goal)
-    await state.set_state(Registration.interests)
-    await callback.message.edit_text("Выберите категорию интересов, затем тему. Можно выбрать до 10 тем.", reply_markup=interest_category_keyboard())
+    goal_map = {
+        "flirt": "Флирт",
+        "communication": "Общение",
+        "friendship": "Дружба",
+        "relationship": "Отношения"
+    }
+    await state.update_data(goal=goal_map.get(goal, goal))
+    await state.set_state(RegistrationState.interests)
+    await callback.message.delete()
+    await callback.message.answer("Выберите категории интересов:", reply_markup=interest_category_keyboard())
     await callback.answer()
 
-@router.callback_query(StateFilter(Registration.interests), F.data.startswith("cat_"))
-async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1].replace("_", " ")
+@router.callback_query(F.data.startswith("cat_"), RegistrationState.interests)
+async def process_interest_category(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_")[1]
+    category = category.replace("_", " ")
     data = await state.get_data()
-    selected = data.get("interests_list", [])
-    await state.update_data(current_category=category)
-    await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
+    selected = data.get("selected_interests", [])
+    # Показываем список тем внутри категории
+    markup = interest_items_keyboard(category, selected)
+    await callback.message.edit_text(f"Выберите интересы в категории «{category}»:", reply_markup=markup)
     await callback.answer()
 
-@router.callback_query(StateFilter(Registration.interests), F.data.startswith("interest_"))
-async def reg_toggle_interest(callback: CallbackQuery, state: FSMContext):
-    topic = callback.data.split("_", 1)[1].replace("_", " ")
+@router.callback_query(F.data.startswith("interest_"), RegistrationState.interests)
+async def process_interest_item(callback: CallbackQuery, state: FSMContext):
+    item = callback.data.split("_")[1]
+    item = item.replace("_", " ")
     data = await state.get_data()
-    selected = data.get("interests_list", [])
-    if topic in selected:
-        selected.remove(topic)
-        await callback.answer(f"Убрано: {topic}")
+    selected = data.get("selected_interests", [])
+    if item in selected:
+        selected.remove(item)
+        await callback.answer(f"Удалено: {item}")
     else:
         if len(selected) >= 10:
-            await callback.answer("Можно выбрать не более 10 тем.", show_alert=True)
+            await callback.answer("Максимум 10 интересов.", show_alert=True)
             return
-        selected.append(topic)
-        await callback.answer(f"Добавлено: {topic}")
-    await state.update_data(interests_list=selected)
-    category = data.get("current_category")
+        selected.append(item)
+        await callback.answer(f"Добавлено: {item}")
+    await state.update_data(selected_interests=selected)
+    # Обновляем клавиатуру – вернуться на категории
+    category = data.get("current_category", "")
     if category:
-        await callback.message.edit_text(f"Выберите темы из категории «{category}» (до 10):", reply_markup=interest_items_keyboard(category, selected))
-    else:
-        await callback.message.edit_text("Выберите категорию:", reply_markup=interest_category_keyboard())
+        markup = interest_items_keyboard(category, selected)
+        await callback.message.edit_reply_markup(reply_markup=markup)
 
-@router.callback_query(StateFilter(Registration.interests), F.data == "interests_back")
-async def reg_interests_back(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("Выберите категорию интересов:", reply_markup=interest_category_keyboard())
+@router.callback_query(F.data == "interests_back", RegistrationState.interests)
+async def interests_back(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Выберите категории интересов:", reply_markup=interest_category_keyboard())
     await callback.answer()
 
-@router.callback_query(StateFilter(Registration.interests), F.data == "interests_done")
-async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "interests_done", RegistrationState.interests)
+async def process_interests_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    selected = data.get("interests_list", [])
-    if selected:
-        joined = ", ".join(selected)
-        await state.update_data(interests=truncate_field(joined, 500))
-    else:
-        await state.update_data(interests=None)
-    await state.set_state(Registration.preferred_gender)
-    await callback.message.edit_text("Кого вы ищете? (выберите пол)", reply_markup=preferred_gender_keyboard())
+    selected = data.get("selected_interests", [])
+    if not selected:
+        await callback.answer("Выберите хотя бы один интерес!", show_alert=True)
+        return
+    await state.update_data(interests=", ".join(selected))
+    await state.set_state(RegistrationState.bio)
+    await callback.message.delete()
+    await callback.message.answer("Напишите немного о себе (био, до 500 символов):")
     await callback.answer()
 
-@router.callback_query(StateFilter(Registration.preferred_gender), F.data.startswith("pref_gender_"))
-async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    gender = callback.data.split("_")[2]
-    await state.update_data(preferred_gender=gender)
-    await state.set_state(Registration.bio)
-    await callback.message.edit_text("Расскажите немного о себе (био):")
-    await callback.answer()
-
-@router.message(Registration.bio)
-async def reg_bio(message: Message, state: FSMContext):
-    bio = truncate_field(message.text, 500)
+@router.message(RegistrationState.bio)
+async def process_bio(message: Message, state: FSMContext):
+    bio = message.text.strip()
+    if bio and len(bio) > 500:
+        await message.answer("Био не может быть длиннее 500 символов.")
+        return
     await state.update_data(bio=bio)
-    await state.set_state(Registration.photo)
-    await message.answer("Отправьте фото (или 'Пропустить')")
+    await state.set_state(RegistrationState.photo)
+    await message.answer("Отправьте ваше фото (можно пропустить, нажав кнопку «Пропустить»):",
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                             [InlineKeyboardButton(text="Пропустить", callback_data="skip_photo")]
+                         ]))
 
-@router.message(Registration.photo, F.content_type.in_({ContentType.PHOTO, ContentType.TEXT}))
-async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
-    data = await state.get_data()
-    user_id = data.get("user_id")
-    photo_file_id = None
-    if message.content_type == ContentType.PHOTO:
-        photo = message.photo[-1]
-        photo_file_id = photo.file_id
-        await save_photo(photo, message.from_user.id)
-    else:
-        if message.text.lower() != "пропустить":
-            await message.answer("Отправьте фото или 'Пропустить'")
-            return
-    if user_id:
-        user = await crud.get_user_by_id(session, user_id)
-        if user:
-            await crud.update_user(
-                session, user,
-                name=data.get("name"),
-                gender=data.get("gender"),
-                age=data.get("age"),
-                city=data.get("city"),
-                favorite_genres=data.get("genres"),
-                favorite_bands=data.get("bands"),
-                favorite_songs=data.get("songs"),
-                search_goal=data.get("goal"),
-                interests=data.get("interests"),
-                preferred_gender=data.get("preferred_gender"),
-                bio=data.get("bio"),
-                photo_file_id=photo_file_id,
-            )
-            await message.answer("Профиль обновлён!", reply_markup=main_reply_keyboard())
-    else:
-        user = await crud.create_user(
-            session,
-            telegram_id=message.from_user.id,
-            username=message.from_user.username,
-            name=data.get("name"),
-            gender=data.get("gender"),
-            age=data.get("age"),
-            city=data.get("city"),
-            favorite_genres=data.get("genres"),
-            favorite_bands=data.get("bands"),
-            favorite_songs=data.get("songs"),
-            search_goal=data.get("goal"),
-            interests=data.get("interests"),
-            preferred_gender=data.get("preferred_gender"),
-            bio=data.get("bio"),
-            photo_file_id=photo_file_id,
-        )
-        await message.answer(
-            "✅ Регистрация завершена!\n\n"
-            "В профиле вы можете скрыть анкету и сменить режим поиска (по всей стране / только в своём городе).\n"
-            "[Настоятельно рекомендуется использовать поиск по всей стране на время запуска бота]",
-            reply_markup=main_reply_keyboard()
-        )
-    await state.clear()
-
-@router.callback_query(F.data == "cancel")
-async def cancel_callback(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.edit_text("Отменено.")
-    await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
+@router.callback_query(F.data == "skip_photo", RegistrationState.photo)
+async def skip_photo(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await callback.message.delete()
+    await finish_registration(callback.message, state, session, callback.bot)
     await callback.answer()
+
+@router.message(RegistrationState.photo)
+async def process_photo(message: Message, state: FSMContext, session: AsyncSession):
+    if not message.photo:
+        await message.answer("Отправьте фото (или нажмите «Пропустить»).")
+        return
+    file_id = message.photo[-1].file_id
+    await state.update_data(photo_file_id=file_id)
+    await finish_registration(message, state, session, message.bot)
+
+async def finish_registration(message: Message, state: FSMContext, session: AsyncSession, bot):
+    data = await state.get_data()
+    ref_code = data.get("ref_code")
+
+    user = User(
+        telegram_id=message.from_user.id,
+        username=message.from_user.username,
+        name=data.get("name"),
+        gender=data.get("gender"),
+        age=data.get("age"),
+        city=data.get("city"),
+        favorite_genres=data.get("genres"),
+        favorite_bands=data.get("bands"),
+        favorite_songs=data.get("songs"),
+        search_goal=data.get("goal"),
+        interests=data.get("interests"),
+        bio=data.get("bio"),
+        photo_file_id=data.get("photo_file_id")
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    # Обработка реферальной ссылки
+    if ref_code:
+        referrer = await crud.get_user_by_referral_code(session, ref_code)
+        if referrer and referrer.id != user.id:
+            user.referred_by = referrer.id
+            await session.commit()
+            await crud.add_referral(session, referrer.id, user.id)
+            try:
+                await bot.send_message(
+                    referrer.telegram_id,
+                    f"🎉 Ваш друг {user.name or 'пользователь'} зарегистрировался по вашей ссылке! "
+                    f"Ваша скидка теперь {referrer.referral_discount}%."
+                )
+            except:
+                pass
+
+    # Генерация реферального кода для нового пользователя
+    if not user.referral_code:
+        user.referral_code = await crud.generate_referral_code(user.telegram_id)
+        await session.commit()
+
+    await state.clear()
+    await message.answer(
+        f"Регистрация завершена!\n\n"
+        f"Ваша реферальная ссылка для приглашения друзей:\n"
+        f"`t.me/MuseTwin_bot?start={user.referral_code}`\n\n"
+        "Приводите друзей – получайте скидку до 90% на премиум!\n"
+        "Каждый новый пользователь по вашей ссылке даёт +10% скидки (максимум 90%).",
+        reply_markup=main_reply_keyboard(),
+        parse_mode="Markdown"
+    )

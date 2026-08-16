@@ -254,3 +254,28 @@ async def get_active_blind_date(session: AsyncSession, user_id: int) -> Optional
         ).order_by(BlindDate.created_at.desc()).limit(1)
     )
     return result.scalar_one_or_none()
+
+async def generate_referral_code(telegram_id: int) -> str:
+    return f"ref_{telegram_id}"
+
+async def get_user_by_referral_code(session: AsyncSession, code: str) -> Optional[User]:
+    result = await session.execute(select(User).where(User.referral_code == code))
+    return result.scalar_one_or_none()
+
+async def add_referral(session: AsyncSession, referrer_id: int, new_user_id: int):
+    referrer = await get_user_by_id(session, referrer_id)
+    if not referrer:
+        return
+    referrer.referral_count += 1
+    referrer.referral_discount = min(referrer.referral_count * 10, 90)
+    await session.commit()
+
+async def apply_referral_discount(session: AsyncSession, user_id: int, base_price: int) -> int:
+    user = await get_user_by_id(session, user_id)
+    if not user:
+        return base_price
+    discount = user.referral_discount or 0
+    if discount > 90:
+        discount = 90
+    final_price = int(base_price * (1 - discount / 100))
+    return final_price

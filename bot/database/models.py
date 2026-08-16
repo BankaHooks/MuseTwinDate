@@ -44,6 +44,11 @@ class User(Base):
     blocks_received = relationship("Block", foreign_keys="Block.blocked_id", back_populates="blocked")
     reports_sent = relationship("Report", foreign_keys="Report.reporter_id", back_populates="reporter")
 
+    referral_code = Column(String(50), unique=True, nullable=True)
+    referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    referral_count = Column(Integer, default=0)
+    referral_discount = Column(Integer, default=0)  
+
 class Like(Base):
     __tablename__ = "likes"
     id = Column(Integer, primary_key=True)
