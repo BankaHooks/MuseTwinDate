@@ -142,7 +142,7 @@ async def seed_users():
             await session.execute(delete(User).where(User.id.in_(bot_ids)))
             await session.commit()
 
-        total = 80
+        total = 15
         all_topics = []
         for topics in INTEREST_CATEGORIES.values():
             all_topics.extend(topics)
