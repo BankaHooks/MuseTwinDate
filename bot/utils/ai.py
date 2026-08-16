@@ -3,7 +3,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from gigachat import GigaChat
-from gigachat.models import Chat, Messages, MessageRole
+from gigachat.models import Chat, Messages, MessagesRole
 from database.models import User
 from config import config
 
@@ -29,7 +29,7 @@ async def generate_icebreakers(user1: User, user2: User) -> List[str]:
     )
     try:
         payload = Chat(
-            messages=[Messages(role=MessageRole.USER, content=prompt)],
+            messages=[Messages(role=MessagesRole.USER, content=prompt)],
             temperature=0.8,
             max_tokens=200
         )
@@ -52,7 +52,7 @@ async def analyze_music_taste(user: User) -> str:
     )
     try:
         payload = Chat(
-            messages=[Messages(role=MessageRole.USER, content=prompt)],
+            messages=[Messages(role=MessagesRole.USER, content=prompt)],
             temperature=0.7,
             max_tokens=120
         )
@@ -86,7 +86,7 @@ async def get_match_recommendation(user: User, candidates: List[User]) -> Dict[s
     )
     try:
         payload = Chat(
-            messages=[Messages(role=MessageRole.USER, content=prompt)],
+            messages=[Messages(role=MessagesRole.USER, content=prompt)],
             temperature=0.5,
             max_tokens=150
         )
@@ -112,7 +112,7 @@ async def generate_blind_date_questions(song: str, user1: User, user2: User) -> 
     )
     try:
         payload = Chat(
-            messages=[Messages(role=MessageRole.USER, content=prompt)],
+            messages=[Messages(role=MessagesRole.USER, content=prompt)],
             temperature=0.8,
             max_tokens=150
         )

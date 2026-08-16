@@ -1,0 +1,87 @@
+diff --git a/bot/config.py b/bot/config.py
+index f66ab38..7f06014 100644
+--- a/bot/config.py
++++ b/bot/config.py
+@@ -15,6 +15,6 @@ class Config:
+     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+     MUSIC_DATASET_PATH = os.getenv("MUSIC_DATASET_PATH", "")
+     MINI_APP_URL = os.getenv("MINI_APP_URL", "https://bankahooks.github.io/MuseTwinDate/")
+-    NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+-    NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
++    GIGACHAT_API_KEY = os.getenv("GIGACHAT_API_KEY")
++    GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat")
+ config = Config()
+\ No newline at end of file
+diff --git a/bot/handlers/menu.py b/bot/handlers/menu.py
+index 1b134e0..5024d0d 100644
+--- a/bot/handlers/menu.py
++++ b/bot/handlers/menu.py
+@@ -1,3 +1,4 @@
++from aiogram import Router, F
+ from aiogram.filters import Command
+ from aiogram.fsm.context import FSMContext
+ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+diff --git a/bot/requirements.txt b/bot/requirements.txt
+index dda8ae8..ce1fc61 100644
+--- a/bot/requirements.txt
++++ b/bot/requirements.txt
+@@ -6,7 +6,4 @@ python-dotenv==1.0.0
+ alembic==1.13.0
+ pydantic==2.5.0
+ redis==5.0.1
+-gigachat==0.1.28
+-sentence-transformers==3.0.1
+-torch==2.3.0
+-huggingface-hub==0.23.0
+\ No newline at end of file
++gigachat==0.1.28
+\ No newline at end of file
+diff --git a/bot/utils/ai.py b/bot/utils/ai.py
+index 472053e..4a9ad3f 100644
+--- a/bot/utils/ai.py
++++ b/bot/utils/ai.py
+@@ -3,7 +3,7 @@ import json
+ import logging
+ from typing import List, Dict, Any, Optional
+ from gigachat import GigaChat
+-from gigachat.models import Chat, Messages, MessageRole
++from gigachat.models import Chat, Messages, MessagesRole
+ from database.models import User
+ from config import config
+ 
+@@ -29,7 +29,7 @@ async def generate_icebreakers(user1: User, user2: User) -> List[str]:
+     )
+     try:
+         payload = Chat(
+-            messages=[Messages(role=MessageRole.USER, content=prompt)],
++            messages=[Messages(role=MessagesRole.USER, content=prompt)],
+             temperature=0.8,
+             max_tokens=200
+         )
+@@ -52,7 +52,7 @@ async def analyze_music_taste(user: User) -> str:
+     )
+     try:
+         payload = Chat(
+-            messages=[Messages(role=MessageRole.USER, content=prompt)],
++            messages=[Messages(role=MessagesRole.USER, content=prompt)],
+             temperature=0.7,
+             max_tokens=120
+         )
+@@ -86,7 +86,7 @@ async def get_match_recommendation(user: User, candidates: List[User]) -> Dict[s
+     )
+     try:
+         payload = Chat(
+-            messages=[Messages(role=MessageRole.USER, content=prompt)],
++            messages=[Messages(role=MessagesRole.USER, content=prompt)],
+             temperature=0.5,
+             max_tokens=150
+         )
+@@ -112,7 +112,7 @@ async def generate_blind_date_questions(song: str, user1: User, user2: User) ->
+     )
+     try:
+         payload = Chat(
+-            messages=[Messages(role=MessageRole.USER, content=prompt)],
++            messages=[Messages(role=MessagesRole.USER, content=prompt)],
+             temperature=0.8,
+             max_tokens=150
+         )
