@@ -45,9 +45,7 @@ async def get_similar_artists(artist_name: str, token: str, limit: int = 5) -> L
     return similar[:limit]
 
 async def enrich_profile_with_vk(user: User, session: AsyncSession, token: str):
-    if not token:
-        return
-    if not user.favorite_bands:
+    if not token or not user.favorite_bands:
         return
     bands = [b.strip() for b in user.favorite_bands.split(",") if b.strip()]
     if not bands:

@@ -84,19 +84,16 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
         await state.clear()
         return
 
-    await crud.update_user(session, user, favorite_songs=songs_str)
-    if bands_str:
-        existing_bands = set([b.strip() for b in (user.favorite_bands or "").split(",") if b.strip()])
-        existing_bands.update([b.strip() for b in bands_str.split(",") if b.strip()])
-        new_bands_str = ", ".join(existing_bands)
-        await crud.update_user(session, user, favorite_bands=new_bands_str)
+    # Сохраняем в vk_audio, а не в favorite_songs
+    await crud.update_user(session, user, vk_audio=songs_str)
+    # Также добавляем группы из VK в favorite_bands? По условию не добавляем, пользователь сам вводит группы.
+    # Но можно добавить как рекомендацию, но не сохранять автоматически. По твоему требованию мы не трогаем любимые группы.
 
     await message.answer(
-        f"✅ Импортировано {len(songs)} песен!\n\n"
-        f"🎵 Любимые песни: {songs_str}\n"
-        f"🎤 Группы: {bands_str}\n\n"
+        f"✅ Импортировано {len(songs)} песен из VK!\n\n"
+        f"🎵 Мы проанализировали: {songs_str}\n\n"
         "Теперь бот будет учитывать их при поиске.\n"
-        "Вы всегда можете отредактировать их в профиле.",
+        "Вы можете добавить любимые группы и песни вручную в профиле.",
         reply_markup=main_reply_keyboard()
     )
     await state.clear()
