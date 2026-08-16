@@ -5,12 +5,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, delete
 from config import config
-from database.models import User, Base
+from database.models import User, Base, Like, Skip, Block, Report, Chat, Payment
 from keyboards.inline import INTEREST_CATEGORIES
 
 # ----- ДАННЫЕ ДЛЯ ГЕНЕРАЦИИ АНКЕТ -----
 
-# Расширенный список имён
 NAMES = [
     "Алексей", "Мария", "Иван", "Екатерина", "Дмитрий", "Анна", "Сергей", "Ольга",
     "Андрей", "Наталья", "Максим", "Елена", "Владимир", "Ирина", "Павел", "Светлана",
@@ -21,7 +20,6 @@ NAMES = [
     "Василий", "Антонина", "Степан", "Злата", "Виталий", "Анжелика", "Олег", "Виолетта"
 ]
 
-# Расширенный список городов
 CITIES = [
     "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань", "Нижний Новгород",
     "Челябинск", "Самара", "Омск", "Ростов-на-Дону", "Уфа", "Красноярск", "Пермь", "Воронеж",
@@ -32,13 +30,11 @@ CITIES = [
     "Ялта", "Судак", "Псков", "Смоленск", "Благовещенск", "Сочи", "Анапа", "Геленджик"
 ]
 
-# Музыкальные жанры
 GENRES = [
     "Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical", "Hip-Hop", "Country",
     "Blues", "Metal", "Punk", "Reggae", "Folk", "Soul", "Funk", "Disco", "R&B", "Alternative"
 ]
 
-# Музыкальные группы
 BANDS = [
     "The Beatles", "Queen", "Nirvana", "Radiohead", "Coldplay", "Imagine Dragons",
     "Linkin Park", "Arctic Monkeys", "The Rolling Stones", "Pink Floyd", "Led Zeppelin",
@@ -48,11 +44,9 @@ BANDS = [
     "Green Day", "Foo Fighters", "Pearl Jam", "Soundgarden", "Alice in Chains", "Stone Temple Pilots",
     "Red Hot Chili Peppers", "R.E.M.", "U2", "The Police", "The Who", "The Kinks",
     "The Doors", "Cream", "Jimi Hendrix Experience", "The Velvet Underground", "Pixies",
-    "My Chemical Romance", "Fall Out Boy", "Panic! At The Disco", "Twenty One Pilots",
-    "Arctic Monkeys", "The Black Keys", "The White Stripes", "The Strokes", "The Libertines"
+    "My Chemical Romance", "Fall Out Boy", "Panic! At The Disco", "Twenty One Pilots"
 ]
 
-# Песни (популярные и известные)
 SONGS = [
     "Bohemian Rhapsody", "Imagine", "Hotel California", "Stairway to Heaven",
     "Smells Like Teen Spirit", "Billie Jean", "Hey Jude", "Yesterday",
@@ -107,50 +101,6 @@ SONGS = [
     "Separator", "The Daily Mail", "Staircase", "Come to Your Senses"
 ]
 
-# Шаблоны для био (комбинируются)
-BIO_TEMPLATES = [
-    # Вступление
-    "Привет! Я {name}, {age} лет, {city}.",
-    "Меня зовут {name}, мне {age}, я из {city}.",
-    "Я {name}, {age} лет, живу в {city}.",
-    "Приветствую! Я {name}, {age} лет, {city}.",
-    "Я {name}, мне {age}, родился(ась) в {city}.",
-    # О характере
-    "Я {trait} человек, {trait2}.",
-    "В душе я {trait}, а в жизни {trait2}.",
-    "Обожаю {hobby} и {hobby2}.",
-    "Люблю {hobby}, а ещё {hobby2}.",
-    "Мои увлечения: {hobby}, {hobby2} и {hobby3}.",
-    "Я {trait}, ценю {value}.",
-    "Ищу {goal}, люблю {hobby}.",
-    "Музыка — моя страсть, особенно {genre}.",
-    "Мой идеальный день: {activity}.",
-    "Я из тех, кто {trait}.",
-    # Музыка
-    "Моя любимая группа — {band}, а песня — {song}.",
-    "Обожаю {band} и {band2}.",
-    "Мой плейлист: {song}, {song2} и {song3}.",
-    "Я меломан, предпочитаю {genre}.",
-    "Под {song} могу рыдать, а под {song2} — танцевать.",
-    # Цель знакомства
-    "Ищу {goal} с человеком, который разделяет мои интересы.",
-    "Хочу найти {goal} для совместных {hobby}.",
-    "В идеале хочу {goal} с тем, кто любит {hobby}.",
-    "Мне важно {value} в отношениях.",
-    # Что ищет в партнёре
-    "Ценю в людях {quality} и {quality2}.",
-    "Мне нужен человек с чувством юмора и любовью к {hobby}.",
-    "Ищу партнёра для {goal}, с которым можно разделить {hobby}.",
-    "Хочу встретить того, кто разделяет мою любовь к {hobby}.",
-    # Детали
-    "В свободное время я {hobby}.",
-    "Люблю проводить время за {hobby}.",
-    "Умею {skill}.",
-    "Могу научить тебя {skill}.",
-    "Моя суперсила — {skill}.",
-]
-
-# Черты характера
 TRAITS = [
     "весёлый", "добрый", "открытый", "романтичный", "энергичный",
     "спокойный", "целеустремлённый", "заботливый", "креативный", "надёжный",
@@ -158,7 +108,6 @@ TRAITS = [
     "нежный", "страстный", "загадочный", "харизматичный", "уверенный"
 ]
 
-# Хобби/увлечения (для био, не только интересы)
 HOBBIES = [
     "путешествия", "чтение", "кино", "кулинария", "спорт", "танцы",
     "фотография", "музыка", "рисование", "настольные игры", "прогулки",
@@ -166,7 +115,6 @@ HOBBIES = [
     "кулинарные эксперименты", "походы в горы", "вечерние прогулки", "киновечера"
 ]
 
-# Навыки
 SKILLS = [
     "играть на гитаре", "готовить пасту", "танцевать сальсу", "рисовать портреты",
     "писать стихи", "разговаривать на английском", "монтировать видео",
@@ -175,7 +123,6 @@ SKILLS = [
     "рассказывать анекдоты", "ориентироваться по звёздам", "заваривать чай"
 ]
 
-# Качества
 QUALITIES = [
     "честность", "чувство юмора", "открытость", "забота", "надёжность",
     "верность", "романтичность", "интеллект", "страсть", "эмпатия",
@@ -183,12 +130,9 @@ QUALITIES = [
     "талант", "доброта", "щедрость", "любопытство", "самостоятельность"
 ]
 
-# Цели знакомства
 GOALS = ["flirt", "communication", "friendship", "relationship"]
 
-# Склонения для био
 def generate_bio(name, age, city, genre, band, song, goals, hobbies_list, traits, skills, qualities):
-    # Выбираем случайные элементы
     trait1 = random.choice(traits)
     trait2 = random.choice([t for t in traits if t != trait1])
     hobby1 = random.choice(hobbies_list)
@@ -202,15 +146,9 @@ def generate_bio(name, age, city, genre, band, song, goals, hobbies_list, traits
         "flirt": "флирта", "communication": "общения",
         "friendship": "дружбы", "relationship": "отношений"
     }[goal]
-    goal_verb = {
-        "flirt": "флиртовать", "communication": "общаться",
-        "friendship": "дружить", "relationship": "строить отношения"
-    }[goal]
     activity = random.choice(["прогулка", "чашка кофе", "вечер с музыкой", "поездка на природу"])
 
-    # Собираем текст из шаблонов (комбинируем несколько частей)
     parts = []
-    # Вступление
     intro = random.choice([
         f"Привет! Я {name}, {age} лет, {city}.",
         f"Меня зовут {name}, мне {age}, я из {city}.",
@@ -219,33 +157,24 @@ def generate_bio(name, age, city, genre, band, song, goals, hobbies_list, traits
         f"Я {name}, мне {age}, родился(ась) в {city}."
     ])
     parts.append(intro)
-    # Характер и хобби
     if random.random() < 0.7:
         parts.append(f"Я {trait1} человек, люблю {hobby1} и {hobby2}.")
     else:
         parts.append(f"В душе я {trait1}, а в жизни {trait2}.")
-    # Музыка
     if random.random() < 0.6:
         parts.append(f"Моя любимая группа — {band}, а песня — {song}.")
     else:
         parts.append(f"Обожаю {band}, под {song} могу рыдать или танцевать.")
-    # Цель знакомства
     parts.append(f"Ищу {goal_text} с человеком, который разделяет мои интересы.")
-    # Качества
     parts.append(f"Ценю в людях {quality1} и {quality2}.")
-    # Детали / увлечения
     if random.random() < 0.5:
         parts.append(f"В свободное время я {hobby3}.")
     else:
         parts.append(f"Умею {skill1}.")
-    # Завершение
     parts.append(f"Буду рад(а) познакомиться и обсудить музыку за {activity}.")
 
-    # Объединяем, перемешиваем, чтобы было естественно
     random.shuffle(parts)
-    # Собираем в текст с точками и пробелами
     bio = " ".join(parts)
-    # Первая буква заглавная, в конце точка, если нет
     bio = bio[0].upper() + bio[1:]
     if not bio.endswith("."):
         bio += "."
@@ -258,12 +187,20 @@ async def seed_users():
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        # Удаляем старых болванок
-        await session.execute(delete(User).where(User.telegram_id < 0))
-        await session.commit()
+        # Сначала удаляем все связанные записи для болванок, а потом самих болванок
+        bots = await session.execute(select(User.id).where(User.telegram_id < 0))
+        bot_ids = [row[0] for row in bots.all()]
+        if bot_ids:
+            await session.execute(delete(Like).where(Like.from_user_id.in_(bot_ids) | Like.to_user_id.in_(bot_ids)))
+            await session.execute(delete(Skip).where(Skip.user_id.in_(bot_ids)))
+            await session.execute(delete(Block).where(Block.blocker_id.in_(bot_ids) | Block.blocked_id.in_(bot_ids)))
+            await session.execute(delete(Report).where(Report.reporter_id.in_(bot_ids) | Report.reported_id.in_(bot_ids)))
+            await session.execute(delete(Chat).where(Chat.user1_id.in_(bot_ids) | Chat.user2_id.in_(bot_ids)))
+            await session.execute(delete(Payment).where(Payment.user_id.in_(bot_ids)))
+            await session.execute(delete(User).where(User.id.in_(bot_ids)))
+            await session.commit()
 
-        total = 80  # можно увеличить до 100
-        # Фото с randomuser.me
+        total = 80
         photo_urls = []
         for i in range(1, 150, 3):
             photo_urls.append(f"https://randomuser.me/api/portraits/men/{i}.jpg")
@@ -271,12 +208,10 @@ async def seed_users():
             photo_urls.append(f"https://randomuser.me/api/portraits/men/{i+2}.jpg")
         random.shuffle(photo_urls)
 
-        # Все интересы из категорий (плоский список)
         all_topics = []
         for topics in INTEREST_CATEGORIES.values():
             all_topics.extend(topics)
 
-        # Создаём анкеты
         for i in range(total):
             gender = random.choice(["Мужской", "Женский"])
             photo_url = photo_urls[i % len(photo_urls)]
@@ -287,19 +222,16 @@ async def seed_users():
             band = random.choice(BANDS)
             song = random.choice(SONGS)
             pref_gender = random.choice(["Мужской", "Женский", "Любой"])
-            # Цель знакомства
             goal = random.choice(GOALS)
-            # Интересы: 3-5 случайных тем из разных категорий (стараемся не повторяться)
+
             num_interests = random.randint(3, 5)
             selected_interests = []
-            # Берем случайные темы, стараясь избегать дублирования
             while len(selected_interests) < num_interests:
                 topic = random.choice(all_topics)
                 if topic not in selected_interests:
                     selected_interests.append(topic)
             interests_str = ", ".join(selected_interests)
 
-            # Генерация био
             bio = generate_bio(name, age, city, genre, band, song, [goal], HOBBIES, TRAITS, SKILLS, QUALITIES)
 
             user = User(
@@ -311,7 +243,7 @@ async def seed_users():
                 city = city,
                 favorite_genres = genre,
                 favorite_bands = band,
-                favorite_songs = song,  # одна песня, но можно добавить несколько
+                favorite_songs = song,
                 preferred_gender = pref_gender,
                 bio = bio,
                 interests = interests_str,
