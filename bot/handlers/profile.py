@@ -141,7 +141,7 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("genre_add_"), StateFilter(ProfileEditState.genres))
 async def edit_genre_add(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_")[2]
+    genre = callback.data.split("_", 1)[1]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
@@ -197,7 +197,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
 
 @router.callback_query(F.data.startswith("cat_"), StateFilter(ProfileEditState.interests))
 async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_")[1]
+    category = callback.data.split("_", 1)[1]
     category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_interests", [])
@@ -208,7 +208,7 @@ async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("interest_"), StateFilter(ProfileEditState.interests))
 async def edit_interest_item(callback: CallbackQuery, state: FSMContext):
-    item = callback.data.split("_")[1]
+    item = callback.data.split("_", 1)[1]
     item = item.replace("_", " ")
     data = await state.get_data()
     selected = data.get("selected_interests", [])
@@ -248,7 +248,7 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
 
 @router.callback_query(F.data.startswith("gamecat_"), StateFilter(ProfileEditState.games))
 async def edit_games_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_")[1]
+    category = callback.data.split("_", 1)[1]
     category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_games", [])
@@ -259,7 +259,7 @@ async def edit_games_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("game_"), StateFilter(ProfileEditState.games))
 async def edit_game_item(callback: CallbackQuery, state: FSMContext):
-    game = callback.data.split("_")[1]
+    game = callback.data.split("_", 1)[1]
     game = game.replace("_", " ")
     data = await state.get_data()
     selected = data.get("selected_games", [])
@@ -338,7 +338,7 @@ async def edit_preferred_gender(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
 async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_")[2]
+    gender = callback.data.split("_")[1]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         user.preferred_gender = gender
@@ -409,7 +409,6 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     for key, value in update_data.items():
         if hasattr(user, key):
             setattr(user, key, value)
-    # Явно сохраняем favorite_games, если есть
     if "games" in data:
         user.favorite_games = data["games"]
     await session.commit()

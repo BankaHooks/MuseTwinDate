@@ -93,7 +93,7 @@ async def process_city(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("genre_add_"), RegistrationState.genres)
 async def process_genre_add(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_")[2]
+    genre = callback.data.split("_", 1)[1]
     data = await state.get_data()
     genres = data.get("genres", [])
     if genre not in genres:
@@ -157,7 +157,7 @@ async def process_goal(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("cat_"), RegistrationState.interests)
 async def process_interest_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_")[1]
+    category = callback.data.split("_", 1)[1]
     category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_interests", [])
@@ -168,7 +168,7 @@ async def process_interest_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("interest_"), RegistrationState.interests)
 async def process_interest_item(callback: CallbackQuery, state: FSMContext):
-    item = callback.data.split("_")[1]
+    item = callback.data.split("_", 1)[1]
     item = item.replace("_", " ")
     data = await state.get_data()
     selected = data.get("selected_interests", [])
@@ -207,7 +207,7 @@ async def process_interests_done(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("gamecat_"), RegistrationState.games)
 async def process_games_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_")[1]
+    category = callback.data.split("_", 1)[1]
     category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_games", [])
@@ -218,7 +218,7 @@ async def process_games_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("game_"), RegistrationState.games)
 async def process_game_item(callback: CallbackQuery, state: FSMContext):
-    game = callback.data.split("_")[1]
+    game = callback.data.split("_", 1)[1]
     game = game.replace("_", " ")
     data = await state.get_data()
     selected = data.get("selected_games", [])
