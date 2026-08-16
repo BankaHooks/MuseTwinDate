@@ -88,12 +88,10 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
-    # Удаляем все скипы
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
-    # Удаляем все лайки, отправленные этим пользователем (чтобы он мог заново оценить всех)
     await session.execute(delete(Like).where(Like.from_user_id == user.id))
     await session.commit()
-    await state.clear()  # очищаем состояние
+    await state.clear()
     await callback.message.delete()
     await show_candidate(callback, state, session)
     await callback.answer()
