@@ -21,9 +21,11 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
     if not user:
         await event.answer("Зарегистрируйтесь через /start")
         return
+
     if reset_skips:
         await session.execute(delete(Skip).where(Skip.user_id == user.id))
         await session.commit()
+
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
         markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -32,6 +34,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
         ])
         await event.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         return
+
     await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
     text = format_user_card(candidate, score)
@@ -41,7 +44,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
             await event.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
         else:
             await event.answer(text, reply_markup=markup)
-    except Exception:
+    except Exception as e:
         await event.answer(text, reply_markup=markup)
 
 @router.message(Command("search"))
@@ -78,6 +81,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         return
     like = await crud.create_like(session, user.id, candidate.id)
     await crud.increment_likes(session, user)
+
     total_likes = await crud.get_likes_count(session, candidate.id)
     if total_likes > candidate.last_like_notification_count:
         count = total_likes
@@ -94,6 +98,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             await session.commit()
         except:
             pass
+
     if like.is_mutual:
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
@@ -186,12 +191,8 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
             )
         else:
             await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        if candidate.photo_file_id:
-            await callback.message.delete()
-            await callback.message.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
-        else:
-            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception as e:
+        await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "view_profile", Browse.candidate_id)
@@ -207,12 +208,15 @@ async def view_profile_callback(callback: CallbackQuery, state: FSMContext, sess
         return
     text = format_user_card(candidate) + "\n\nДополнительно:"
     markup = profile_actions_keyboard()
-    if candidate.photo_file_id:
-        await callback.message.edit_media(
-            InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-            reply_markup=markup
-        )
-    else:
+    try:
+        if candidate.photo_file_id:
+            await callback.message.edit_media(
+                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
+                reply_markup=markup
+            )
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception as e:
         await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
@@ -230,11 +234,14 @@ async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: As
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     text = format_user_card(candidate)
     markup = browse_actions_keyboard()
-    if candidate.photo_file_id:
-        await callback.message.edit_media(
-            InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-            reply_markup=markup
-        )
-    else:
+    try:
+        if candidate.photo_file_id:
+            await callback.message.edit_media(
+                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
+                reply_markup=markup
+            )
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception as e:
         await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
