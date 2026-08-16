@@ -45,5 +45,5 @@ async def copy_referral(callback: CallbackQuery, session: AsyncSession):
             parse_mode="Markdown"
         )
         await callback.answer("Ссылка отправлена в чат!")
-    except:
+    except Exception as e:
         await callback.answer("Не удалось отправить")
