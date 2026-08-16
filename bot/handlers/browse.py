@@ -37,6 +37,19 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 
     await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
+
+    data = await state.get_data()
+    view_count = data.get("view_count", 0) + 1
+    await state.update_data(view_count=view_count)
+
+    if view_count % 7 == 0:
+        try:
+            await event.answer(
+                "🔍 Вы просмотрели 7 анкет! Если заметили баг или есть идея, напишите @danhooks."
+            )
+        except:
+            pass
+
     text = format_user_card(candidate, score)
     markup = browse_actions_keyboard()
     try:
@@ -181,6 +194,19 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
         await callback.answer()
         return
     await state.update_data(candidate_id=candidate.id)
+
+    data = await state.get_data()
+    view_count = data.get("view_count", 0) + 1
+    await state.update_data(view_count=view_count)
+
+    if view_count % 7 == 0:
+        try:
+            await callback.message.answer(
+                "🔍 Вы просмотрели 7 анкет! Если заметили баг или есть идея, напишите @danhooks."
+            )
+        except:
+            pass
+
     text = format_user_card(candidate, score)
     markup = browse_actions_keyboard()
     try:
