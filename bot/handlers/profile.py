@@ -68,7 +68,12 @@ async def profile_back(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data == "profile_edit_menu")
 async def profile_edit_menu(callback: CallbackQuery):
-    await callback.message.edit_text("Выберите поле для редактирования:", reply_markup=profile_edit_keyboard())
+    text = "Выберите поле для редактирования:"
+    markup = profile_edit_keyboard()
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=markup)
+    else:
+        await callback.message.edit_text(text=text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "profile_search_settings")
@@ -77,7 +82,12 @@ async def profile_search_settings(callback: CallbackQuery, session: AsyncSession
     if not user:
         await callback.answer("Зарегистрируйтесь через /start")
         return
-    await callback.message.edit_text("Настройки поиска:", reply_markup=profile_search_settings_keyboard(user))
+    text = "Настройки поиска:"
+    markup = profile_search_settings_keyboard(user)
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=markup)
+    else:
+        await callback.message.edit_text(text=text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "reset_profile")
