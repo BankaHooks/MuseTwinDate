@@ -57,24 +57,23 @@ def calculate_match_score(user1: User, user2: User) -> int:
     interests1 = parse_comma_separated(user1.interests)
     interests2 = parse_comma_separated(user2.interests)
 
-    score = 30
+    score = 30 
 
     common_songs = songs1 & songs2
-    score += len(common_songs) * 20
+    score += len(common_songs) * 30
 
     common_bands = bands1 & bands2
-    score += len(common_bands) * 15
+    score += len(common_bands) * 20
 
     common_genres = genres1 & genres2
     score += len(common_genres) * 20
 
-    # 4. Родственные группы жанров (только для жанров, которые не совпали точно)
     remaining_genres1 = genres1 - common_genres
     remaining_genres2 = genres2 - common_genres
     groups1 = {get_genre_group(g) for g in remaining_genres1}
     groups2 = {get_genre_group(g) for g in remaining_genres2}
     common_groups = groups1 & groups2
-    score += len(common_groups) * 15
+    score += len(common_groups) * 20
 
     common_games = games1 & games2
     score += len(common_games) * 10
