@@ -8,7 +8,7 @@ import random
 import asyncio
 from database import crud
 from database.models import Skip, Like, BlindDate
-from utils.ai import analyze_music_taste, generate_blind_date_questions
+from utils.ai import analyze_music_taste, generate_blind_date_questions, get_match_explanation
 from utils.matching import get_candidates_sorted
 from keyboards.inline import (
     premium_features_keyboard, browse_actions_keyboard,
@@ -199,8 +199,11 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
         await callback.answer()
         return
 
-    candidates_data = [{"id": cand.id, "score": round(score*100)} for cand, score in scored]
+    # score уже в процентах (0..100)
+    candidates_data = [{"id": cand.id, "score": score} for cand, score in scored]
     await state.update_data(ai_candidates=candidates_data, ai_index=0)
+    # Передаём также текущего пользователя для пояснений
+    await state.update_data(ai_user=user)
     await show_ai_candidate(callback.message, state, session, edit=False, bot=callback.bot)
     await callback.answer()
 
@@ -208,6 +211,7 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
     data = await state.get_data()
     candidates = data.get("ai_candidates", [])
     index = data.get("ai_index", 0)
+    user = data.get("ai_user")  # текущий пользователь
     if not candidates or index >= len(candidates):
         text = "Вы просмотрели всех AI-рекомендованных кандидатов."
         markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -230,6 +234,16 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
 
     from utils.helpers import format_user_card
     text = format_user_card(candidate, score)
+
+    # Добавляем AI-пояснение, если ключ есть и функция доступна
+    if config.GIGACHAT_API_KEY and user:
+        try:
+            explanation = await get_match_explanation(user, candidate, score)
+            if explanation:
+                text += f"\n\n🤖 AI-пояснение: {explanation}"
+        except Exception as e:
+            logger.error(f"AI explanation error: {e}")
+
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"ai_like_{candidate_id}"),
          InlineKeyboardButton(text="⏭️ Скип", callback_data=f"ai_skip_{candidate_id}")],
@@ -492,7 +506,7 @@ async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Ошибка")
         return
 
-    players = await crud.get_users_by_game(session, game.lower().strip(), user.id, limit=10)
+    players = await crud.get_users_by_game(session, game, user.id, limit=10)
     if not players:
         await edit_or_caption(callback,
             f"🎮 По игре «{game}» никого не найдено.\nПопробуйте другую игру.",
