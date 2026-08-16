@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
@@ -13,7 +14,6 @@ from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
 from handlers import start, menu, browse, likes, profile, premium, report, admin, ai
-import random
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -134,10 +134,7 @@ async def main():
     asyncio.create_task(inactivity_notifier())
     asyncio.create_task(fake_activity_simulator())
     if config.USE_WEBHOOK:
-        # Здесь должен быть сервер для приёма вебхуков. Если его нет, рекомендуется выключить USE_WEBHOOK.
         logger.warning("Webhook mode enabled but no webhook server implemented. Falling back to polling.")
-        # Для продакшена необходимо добавить aiohttp или FastAPI обработчик.
-        # Пример см. в документации aiogram.
     else:
         logger.info("Starting polling...")
         await dp.start_polling(bot, skip_updates=True)

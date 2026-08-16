@@ -1,13 +1,14 @@
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from database import crud
 from database.models import User
 from config import config
+from utils.helpers import format_user_card
 
 router = Router()
 ADMIN_IDS = config.ADMIN_IDS
@@ -41,30 +42,134 @@ async def admin_reports(callback: CallbackQuery, session: AsyncSession):
         return
     reports = await crud.get_reports(session, resolved=False)
     if not reports:
-        await callback.message.edit_text("Нет непросмотренных репортов.")
+        await callback.message.edit_text("Нет непросмотренных репортов.", reply_markup=admin_keyboard())
         await callback.answer()
         return
-    text = "Непросмотренные репорты:\n\n"
+    text = "📋 Непросмотренные репорты:\n\n"
+    buttons = []
     for r in reports[:10]:
         reporter = await crud.get_user_by_id(session, r.reporter_id)
         reported = await crud.get_user_by_id(session, r.reported_id)
+        reason_ru = {
+            "spam": "Спам",
+            "inappropriate": "Неприемлемый контент",
+            "fake": "Фейковый профиль",
+            "other": "Другое"
+        }.get(r.reason, r.reason)
         text += f"ID {r.id}: {reporter.name or reporter.username} → {reported.name or reported.username}\n"
-        text += f"Причина: {r.reason}\n\n"
-    await callback.message.edit_text(text, reply_markup=admin_keyboard())
+        text += f"Причина: {reason_ru}\n"
+        if r.description:
+            text += f"Описание: {r.description}\n"
+        text += "\n"
+        buttons.append([InlineKeyboardButton(
+            text=f"👤 Анкета (ID {reported.id})",
+            callback_data=f"admin_user_detail_{reported.id}"
+        )])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")])
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "admin_users")
-async def admin_users(callback: CallbackQuery, session: AsyncSession):
+async def admin_users_menu(callback: CallbackQuery, session: AsyncSession):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("Нет прав")
         return
     total = await session.scalar(select(func.count()).select_from(User))
+    male = await session.scalar(select(func.count()).select_from(User).where(User.gender == "Мужской"))
+    female = await session.scalar(select(func.count()).select_from(User).where(User.gender == "Женский"))
     active = await session.scalar(
         select(func.count()).select_from(User).where(User.last_activity >= datetime.utcnow() - timedelta(days=7))
     )
     premium = await session.scalar(select(func.count()).select_from(User).where(User.is_premium == True))
-    text = f"Всего пользователей: {total}\nАктивных за 7 дней: {active}\nПремиум: {premium}"
-    await callback.message.edit_text(text, reply_markup=admin_keyboard())
+    text = f"📊 Статистика:\nВсего: {total}\nМужчин: {male}\nЖенщин: {female}\nАктивных (7 дней): {active}\nПремиум: {premium}"
+    buttons = [
+        [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users_list_all_0")],
+        [InlineKeyboardButton(text="👨 Мужчины", callback_data="admin_users_list_male_0")],
+        [InlineKeyboardButton(text="👩 Женщины", callback_data="admin_users_list_female_0")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")]
+    ]
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("admin_users_list_"))
+async def admin_users_list(callback: CallbackQuery, session: AsyncSession):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет прав")
+        return
+    _, gender, page_str = callback.data.split("_")
+    page = int(page_str)
+    limit = 10
+    offset = page * limit
+    stmt = select(User).order_by(User.id)
+    if gender == "male":
+        stmt = stmt.where(User.gender == "Мужской")
+    elif gender == "female":
+        stmt = stmt.where(User.gender == "Женский")
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+    users = await session.execute(stmt.offset(offset).limit(limit))
+    users = users.scalars().all()
+    if not users:
+        await callback.answer("Нет пользователей.")
+        return
+    text = f"👥 Список пользователей ({(page*limit)+1}–{min((page+1)*limit, total)} из {total}):\n\n"
+    buttons = []
+    for u in users:
+        name = u.name or u.username or "Без имени"
+        text += f"ID {u.id}: {name} ({(u.username) and '@'+u.username or 'нет юза'})\n"
+        buttons.append([InlineKeyboardButton(
+            text=f"👤 {name}",
+            callback_data=f"admin_user_detail_{u.id}"
+        )])
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"admin_users_list_{gender}_{page-1}"))
+    if (page+1)*limit < total:
+        nav.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"admin_users_list_{gender}_{page+1}"))
+    if nav:
+        buttons.append(nav)
+    buttons.append([InlineKeyboardButton(text="🔙 Назад к статистике", callback_data="admin_users")])
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("admin_user_detail_"))
+async def admin_user_detail(callback: CallbackQuery, session: AsyncSession):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет прав")
+        return
+    user_id = int(callback.data.split("_")[3])
+    user = await crud.get_user_by_id(session, user_id)
+    if not user:
+        await callback.answer("Пользователь не найден.")
+        return
+    text = format_user_card(user)
+    if user.username:
+        profile_link = f"https://t.me/{user.username}"
+    else:
+        profile_link = f"tg://user?id={user.telegram_id}"
+    buttons = [
+        [InlineKeyboardButton(text="💬 Перейти в Telegram", url=profile_link)],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")]
+    ]
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+    if user.photo_file_id:
+        await callback.message.edit_media(
+            InputMediaPhoto(media=user.photo_file_id, caption=text),
+            reply_markup=markup
+        )
+    else:
+        await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_back")
+async def admin_back(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет прав")
+        return
+    await callback.message.delete()
+    await callback.message.answer("Админ-панель:", reply_markup=admin_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "admin_notify")
@@ -90,6 +195,7 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
     ])
     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
+    await state.clear()
 
 @router.callback_query(F.data.startswith("admin_send_"))
 async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):

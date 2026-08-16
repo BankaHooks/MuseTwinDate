@@ -192,10 +192,6 @@ async def update_last_activity(session: AsyncSession, user: User):
     user.last_activity = datetime.utcnow()
     await session.commit()
 
-async def clear_all_likes(session: AsyncSession):
-    await session.execute(delete(Like))
-    await session.commit()
-
 async def get_random_bot(session: AsyncSession, exclude_user_ids: list = None) -> Optional[User]:
     stmt = select(User).where(
         User.telegram_id < 0,

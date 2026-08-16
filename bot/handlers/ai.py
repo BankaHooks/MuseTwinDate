@@ -128,7 +128,6 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     questions = await generate_blind_date_questions(song, user, partner)
     safe_song = escape_markdown(song)
     partner_name = escape_markdown(partner.name or "партнёром")
-    # Экранируем каждый вопрос
     safe_questions = [escape_markdown(q) for q in questions]
     if partner.username:
         partner_link = f"@{partner.username}"

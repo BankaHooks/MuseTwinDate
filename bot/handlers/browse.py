@@ -10,6 +10,7 @@ from database.models import Skip
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
+from states.report import ReportState
 from utils.helpers import format_user_card
 from utils.matching import pick_candidate_simple
 from utils.security import escape_markdown
@@ -125,8 +126,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
-        except Exception as e:
-            print(f"Ошибка отправки уведомления о взаимном лайке: {e}")
+        except:
+            pass
         try:
             await callback.bot.send_message(
                 user.telegram_id,
@@ -134,8 +135,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
                 f"Напишите ему: {candidate_link}",
                 parse_mode="Markdown"
             )
-        except Exception as e:
-            print(f"Ошибка отправки уведомления о взаимном лайке: {e}")
+        except:
+            pass
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Лайк поставлен!")
@@ -170,23 +171,34 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
         )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("reportreason_"))
-async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+@router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
+async def report_reason(callback: CallbackQuery, state: FSMContext):
     reason = callback.data.split("_", 1)[1]
     allowed = ["spam", "inappropriate", "fake", "other"]
     if reason not in allowed:
         await callback.answer("Некорректная причина.", show_alert=True)
         return
+    await state.update_data(report_reason=reason)
+    await state.set_state(ReportState.description)
+    await callback.message.edit_text(
+        "Опишите проблему подробнее (или отправьте 'Пропустить', чтобы оставить пустым):"
+    )
+    await callback.answer()
+
+@router.message(ReportState.description)
+async def report_description(message: Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     target_id = data.get("report_target")
-    if not target_id:
-        await callback.answer("Ошибка: цель не найдена.")
+    reason = data.get("report_reason")
+    if not target_id or not reason:
+        await message.answer("Ошибка: не найдена цель или причина.")
+        await state.clear()
         return
-    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    await crud.create_report(session, user.id, target_id, reason)
-    await callback.answer("Жалоба отправлена. Спасибо.", show_alert=True)
-    await state.update_data(report_target=None)
-    await show_next(callback, state, session)
+    description = message.text if message.text.lower() != "пропустить" else None
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    await crud.create_report(session, user.id, target_id, reason, description)
+    await message.answer("Жалоба отправлена. Спасибо!", reply_markup=main_reply_keyboard())
+    await state.clear()
 
 async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
