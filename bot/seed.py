@@ -1,6 +1,7 @@
 import asyncio
 import random
 from datetime import datetime
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from config import config
@@ -8,21 +9,32 @@ from database.models import User, Base
 
 NAMES = ["Алексей", "Мария", "Иван", "Екатерина", "Дмитрий", "Анна", "Сергей", "Ольга",
          "Андрей", "Наталья", "Максим", "Елена", "Владимир", "Ирина", "Павел", "Светлана",
-         "Юрий", "Татьяна", "Артем", "Виктория", "Никита", "Анастасия", "Кирилл", "Дарья"]
+         "Юрий", "Татьяна", "Артем", "Виктория", "Никита", "Анастасия", "Кирилл", "Дарья",
+         "Глеб", "Варвара", "Михаил", "Полина", "Егор", "Алиса", "Роман", "София"]
 
 CITIES = ["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань", "Нижний Новгород",
-          "Челябинск", "Самара", "Омск", "Ростов-на-Дону", "Уфа", "Красноярск", "Пермь", "Воронеж"]
+          "Челябинск", "Самара", "Омск", "Ростов-на-Дону", "Уфа", "Красноярск", "Пермь", "Воронеж",
+          "Волгоград", "Краснодар", "Саратов", "Тюмень", "Тольятти", "Ижевск", "Барнаул", "Ульяновск",
+          "Иркутск", "Хабаровск", "Ярославль", "Владивосток", "Махачкала", "Томск", "Оренбург", "Кемерово"]
 
-GENRES = ["Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical", "Hip-Hop", "Country", "Blues", "Metal"]
+GENRES = ["Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical", "Hip-Hop", "Country", "Blues", "Metal",
+          "Punk", "Reggae", "Folk", "Soul", "Funk", "Disco"]
 
 BANDS = ["The Beatles", "Queen", "Nirvana", "Radiohead", "Coldplay", "Imagine Dragons",
          "Linkin Park", "Arctic Monkeys", "The Rolling Stones", "Pink Floyd", "Led Zeppelin",
-         "The Weeknd", "Daft Punk", "Rammstein", "Metallica", "ABBA", "Depeche Mode"]
+         "The Weeknd", "Daft Punk", "Rammstein", "Metallica", "ABBA", "Depeche Mode",
+         "The Smiths", "The Cure", "Joy Division", "New Order", "Kraftwerk", "Talking Heads",
+         "The Strokes", "Interpol", "The Killers", "Muse", "Oasis", "Blur", "Pulp", "Suede"]
 
 SONGS = ["Bohemian Rhapsody", "Imagine", "Hotel California", "Stairway to Heaven",
          "Smells Like Teen Spirit", "Billie Jean", "Hey Jude", "Yesterday", "Shape of You",
          "Uptown Funk", "Despacito", "Waka Waka", "Rolling in the Deep", "Someone Like You",
-         "Bad Guy", "Blinding Lights", "Levitating", "Montero", "Stay", "Peaches"]
+         "Bad Guy", "Blinding Lights", "Levitating", "Montero", "Stay", "Peaches",
+         "Lose Yourself", "Stan", "The Real Slim Shady", "Without Me", "Rap God",
+         "God's Plan", "Sicko Mode", "Goosebumps", "Magna Carta...", "Yeezus",
+         "My Beautiful Dark Twisted Fantasy", "To Pimp a Butterfly", "good kid, m.A.A.d city",
+         "The Dark Side of the Moon", "Wish You Were Here", "Animals", "The Wall",
+         "Led Zeppelin IV", "Physical Graffiti", "Houses of the Holy", "Presence"]
 
 BIOS = [
     "Люблю музыку и путешествия",
@@ -34,7 +46,12 @@ BIOS = [
     "Фанат инди-культуры и нестандартных решений",
     "Классика в душе, рок в сердце",
     "Хип-хоп и ритм — моё всё",
-    "Люблю открывать новую музыку и делиться ей"
+    "Люблю открывать новую музыку и делиться ей",
+    "Мой мир — это звуки и эмоции",
+    "Ищу родственную душу через музыку",
+    "Меломан с 90-х",
+    "Без музыки жить не могу",
+    "Вечный поиск идеального саундтрека"
 ]
 
 PREFERRED_GENDERS = ["Мужской", "Женский", "Любой"]
@@ -46,18 +63,24 @@ async def seed_users():
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        for i in range(40):
+        # Удаляем старых тестовых пользователей (telegram_id < 0)
+        await session.execute(delete(User).where(User.telegram_id < 0))
+        await session.commit()
+        print("Старые тестовые пользователи удалены.")
+
+        total = 300
+        for i in range(total):
             name = random.choice(NAMES)
-            age = random.randint(18, 40)
+            age = random.randint(18, 45)
             city = random.choice(CITIES)
             genre = random.choice(GENRES)
             band = random.choice(BANDS)
-            songs = random.sample(SONGS, 2)
+            songs = random.sample(SONGS, 3)
             songs_text = ", ".join(songs)
             bio = random.choice(BIOS)
             gender = random.choice(["Мужской", "Женский"])
             pref_gender = random.choice(PREFERRED_GENDERS)
-            photo_url = f"https://picsum.photos/seed/{i}/300/400"
+            photo_url = f"https://picsum.photos/seed/{i+100}/300/400"
 
             user = User(
                 telegram_id = -i - 1,
@@ -72,14 +95,14 @@ async def seed_users():
                 preferred_gender = pref_gender,
                 bio = bio,
                 photo_file_id = photo_url,
-                is_premium = random.choice([True, False, False, False]),
+                is_premium = random.choice([True, False, False, False, False]),
                 created_at = datetime.utcnow()
             )
             session.add(user)
-            if (i + 1) % 10 == 0:
-                print(f"Создано {i+1} пользователей...")
+            if (i + 1) % 50 == 0:
+                print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print("Готово! Создано 40 тестовых анкет с фото.")
+    print(f"Готово! Создано {total} тестовых анкет с фото.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())
