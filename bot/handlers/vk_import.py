@@ -1,3 +1,5 @@
+import logging
+import re
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
@@ -6,15 +8,15 @@ from database import crud
 from keyboards.reply import main_reply_keyboard
 from utils.vk_api import get_user_audio
 from config import config
-import re
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 @router.callback_query(F.data == "import_vk")
 async def import_vk_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Введите ссылку на ваш профиль VK (например, https://vk.com/id12345) или просто ID пользователя.\n\n"
-        "Бот попытается получить до 10 ваших аудиозаписей и добавить их в профиль.\n"
+        "🔗 Введите ссылку на ваш профиль VK (например, https://vk.com/id12345) или просто ID пользователя.\n\n"
+        "Бот попытается получить до 10 ваших аудиозаписей и использовать их для подбора.\n"
         "Если профиль закрыт, вы сможете добавить песни вручную."
     )
     await state.set_state("vk_import_waiting")
@@ -22,6 +24,8 @@ async def import_vk_start(callback: CallbackQuery, state: FSMContext):
 
 @router.message(F.text, F.state == "vk_import_waiting")
 async def import_vk_process(message: Message, state: FSMContext, session: AsyncSession):
+    await message.answer("🔄 Обрабатываю запрос...")
+
     text = message.text.strip()
     user_id = None
     match = re.search(r'vk\.com/(id|club|public)(\d+)', text)
@@ -31,21 +35,27 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
         user_id = text
 
     if not user_id:
-        await message.answer("Не удалось распознать ID. Попробуйте ещё раз или введите группы вручную.")
+        await message.answer("❌ Не удалось распознать ID. Попробуйте ещё раз или введите группы вручную.")
         await state.clear()
         return
 
     if not config.VK_ACCESS_TOKEN:
-        await message.answer("VK API не настроен. Пожалуйста, добавьте токен в настройках.")
+        await message.answer("❌ VK API не настроен. Пожалуйста, добавьте токен в настройках бота.")
         await state.clear()
         return
 
-    await message.answer("🔄 Получаю ваши аудиозаписи из VK...")
-    audio_list = await get_user_audio(user_id, config.VK_ACCESS_TOKEN, limit=10)
+    await message.answer("🎵 Получаю ваши аудиозаписи из VK...")
+    try:
+        audio_list = await get_user_audio(user_id, config.VK_ACCESS_TOKEN, limit=10)
+    except Exception as e:
+        logger.error(f"VK import error: {e}")
+        await message.answer(f"❌ Ошибка при запросе к VK: {e}")
+        await state.clear()
+        return
 
     if not audio_list:
         await message.answer(
-            "Не удалось получить аудиозаписи. Возможно, профиль закрыт или аудио недоступны.\n\n"
+            "❌ Не удалось получить аудиозаписи. Возможно, профиль закрыт или аудио недоступны.\n\n"
             "Вы можете добавить любимые песни вручную через редактирование профиля (кнопка «Песни»)."
         )
         await state.clear()
@@ -53,11 +63,10 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
 
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     if not user:
-        await message.answer("Зарегистрируйтесь через /start")
+        await message.answer("❌ Пользователь не найден. Зарегистрируйтесь через /start")
         await state.clear()
         return
 
-    # Формируем строки для сохранения
     songs = []
     bands = set()
     for audio in audio_list:
@@ -67,18 +76,16 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
             songs.append(f"{artist} - {title}")
             bands.add(artist)
 
-    songs_str = ", ".join(songs[:5])  # сохраним до 5 песен
-    bands_str = ", ".join(list(bands)[:5])  # до 5 групп
+    songs_str = ", ".join(songs[:5])
+    bands_str = ", ".join(list(bands)[:5])
 
     if not songs_str:
-        await message.answer("Не удалось извлечь песни.")
+        await message.answer("❌ Не удалось извлечь песни из полученных данных.")
         await state.clear()
         return
 
-    # Обновляем профиль
     await crud.update_user(session, user, favorite_songs=songs_str)
     if bands_str:
-        # Добавляем группы (если есть)
         existing_bands = set([b.strip() for b in (user.favorite_bands or "").split(",") if b.strip()])
         existing_bands.update([b.strip() for b in bands_str.split(",") if b.strip()])
         new_bands_str = ", ".join(existing_bands)
@@ -86,8 +93,9 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
 
     await message.answer(
         f"✅ Импортировано {len(songs)} песен!\n\n"
-        f"Любимые песни: {songs_str}\n"
-        f"Группы: {bands_str}\n\n"
+        f"🎵 Любимые песни: {songs_str}\n"
+        f"🎤 Группы: {bands_str}\n\n"
+        "Теперь бот будет учитывать их при поиске.\n"
         "Вы всегда можете отредактировать их в профиле.",
         reply_markup=main_reply_keyboard()
     )
