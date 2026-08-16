@@ -7,11 +7,10 @@ from utils.helpers import parse_comma_separated, normalize_goal
 
 logger = logging.getLogger(__name__)
 
-# Веса для расчёта совпадения (сумма = 1.0)
 WEIGHT_SONGS = 0.30
-WEIGHT_BANDS = 0.20
-WEIGHT_GENRES = 0.15
-WEIGHT_GAMES = 0.15
+WEIGHT_BANDS = 0.25
+WEIGHT_GENRES = 0.25
+WEIGHT_GAMES = 0.10
 WEIGHT_INTERESTS = 0.10
 WEIGHT_GOAL = 0.10
 
@@ -40,7 +39,6 @@ def calculate_match_score(user1: User, user2: User) -> float:
     games_score = jaccard_similarity(games1, games2)
     interests_score = jaccard_similarity(interests1, interests2)
 
-    # Нормализация целей к английским ключам
     goal1 = normalize_goal(user1.search_goal)
     goal2 = normalize_goal(user2.search_goal)
     goal_score = 1.0 if goal1 and goal2 and goal1 == goal2 else 0.0

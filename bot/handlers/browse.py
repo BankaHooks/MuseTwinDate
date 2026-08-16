@@ -19,6 +19,12 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
+async def edit_or_caption(callback: CallbackQuery, text: str, reply_markup=None, parse_mode=None):
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    else:
+        await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+
 async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
     if isinstance(event, CallbackQuery):
         user_id = event.from_user.id
@@ -96,13 +102,12 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     await show_candidate(callback, state, session)
     await callback.answer()
 
-# Обработчики без фильтра Browse.candidate_id, чтобы они срабатывали всегда
-@router.callback_query(F.data == "like")
+@router.callback_query(F.data == "like", Browse.candidate_id)
 async def like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     candidate_id = data.get("candidate_id")
     if not candidate_id:
-        await callback.answer("Нет активной анкеты. Начните поиск заново.", show_alert=True)
+        await callback.answer("Нет анкеты.")
         return
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not await crud.can_like(session, user):
@@ -116,24 +121,22 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
     like = await crud.create_like(session, user.id, candidate.id)
     await crud.increment_likes(session, user)
 
-    # Отправляем уведомление о количестве лайков только если лайк НЕ взаимный
-    if not like.is_mutual:
-        total_likes = await crud.get_likes_count(session, candidate.id)
-        if total_likes > candidate.last_like_notification_count:
-            count = total_likes
-            display_count = "9+" if count > 9 else str(count)
-            if count == 1:
-                text = "Вас лайкнул 1 человек."
-            elif 2 <= count <= 4:
-                text = f"Вас лайкнули {display_count} человека."
-            else:
-                text = f"Вас лайкнули {display_count} человек."
-            try:
-                await callback.bot.send_message(candidate.telegram_id, text)
-                candidate.last_like_notification_count = count
-                await session.commit()
-            except Exception as e:
-                logger.error(f"Failed to send like count notification: {e}")
+    total_likes = await crud.get_likes_count(session, candidate.id)
+    if total_likes > candidate.last_like_notification_count:
+        count = total_likes
+        display_count = "9+" if count > 9 else str(count)
+        if count == 1:
+            text = "Вас лайкнул 1 человек."
+        elif 2 <= count <= 4:
+            text = f"Вас лайкнули {display_count} человека."
+        else:
+            text = f"Вас лайкнули {display_count} человек."
+        try:
+            await callback.bot.send_message(candidate.telegram_id, text)
+            candidate.last_like_notification_count = count
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Failed to send like count notification: {e}")
 
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username)
@@ -163,24 +166,22 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
     await state.update_data(candidate_id=None)
     await show_next(callback, state, session)
 
-@router.callback_query(F.data == "skip")
+@router.callback_query(F.data == "skip", Browse.candidate_id)
 async def skip_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     candidate_id = data.get("candidate_id")
-    if not candidate_id:
-        await callback.answer("Нет активной анкеты.", show_alert=True)
-        return
-    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    await crud.create_skip(session, user.id, candidate_id)
+    if candidate_id:
+        user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+        await crud.create_skip(session, user.id, candidate_id)
     await state.update_data(candidate_id=None)
     await show_next(callback, state, session)
 
-@router.callback_query(F.data == "send_envelope")
+@router.callback_query(F.data == "send_envelope", Browse.candidate_id)
 async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     candidate_id = data.get("candidate_id")
     if not candidate_id:
-        await callback.answer("Нет активной анкеты.", show_alert=True)
+        await callback.answer("Нет анкеты.")
         return
     await state.update_data(like_target=candidate_id)
     await state.set_state(LikeMessageState.text)
@@ -259,12 +260,12 @@ async def show_next_from_message(message: Message, state: FSMContext, session: A
     except Exception as e:
         await message.answer(text, reply_markup=markup)
 
-@router.callback_query(F.data == "report_user")
+@router.callback_query(F.data == "report_user", Browse.candidate_id)
 async def report_user(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     candidate_id = data.get("candidate_id")
     if not candidate_id:
-        await callback.answer("Нет активной анкеты.", show_alert=True)
+        await callback.answer("Нет анкеты.")
         return
     await state.update_data(report_target=candidate_id)
     if callback.message.photo:
@@ -279,7 +280,7 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
         )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("reportreason_"))
+@router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
 async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     reason = callback.data.split("_", 1)[1]
     allowed = ["spam", "inappropriate", "fake", "other"]
@@ -305,7 +306,7 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
             [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
-        await callback.message.edit_text("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
+        await edit_or_caption(callback, "Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         await state.clear()
         await callback.answer()
         return
@@ -333,7 +334,7 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
                 reply_markup=markup
             )
         else:
-            await callback.message.edit_text(text, reply_markup=markup)
+            await edit_or_caption(callback, text, reply_markup=markup)
     except Exception as e:
-        await callback.message.edit_text(text, reply_markup=markup)
+        await edit_or_caption(callback, text, reply_markup=markup)
     await callback.answer()
