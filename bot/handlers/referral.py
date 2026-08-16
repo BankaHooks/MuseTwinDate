@@ -1,9 +1,7 @@
 from aiogram import Router, F
-from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from utils.security import escape_markdown
 
 router = Router()
 
@@ -45,5 +43,5 @@ async def copy_referral(callback: CallbackQuery, session: AsyncSession):
             parse_mode="Markdown"
         )
         await callback.answer("Ссылка отправлена в чат!")
-    except Exception as e:
+    except:
         await callback.answer("Не удалось отправить")
