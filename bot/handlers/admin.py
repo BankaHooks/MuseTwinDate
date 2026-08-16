@@ -212,7 +212,7 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
     ])
     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
-    await state.clear()
+    # state.clear() удалён — теперь не стираем notify_text преждевременно
 
 @router.callback_query(F.data.startswith("admin_send_"))
 async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -280,11 +280,7 @@ async def admin_premium_set(message: Message, state: FSMContext, session: AsyncS
     if not user:
         await message.answer("Пользователь не найден.")
         return
-    
-    # Выдаём премиум
     await crud.set_premium(session, user.id, months)
-    
-    # Отправляем уведомление пользователю
     try:
         await message.bot.send_message(
             user.telegram_id,
@@ -292,7 +288,6 @@ async def admin_premium_set(message: Message, state: FSMContext, session: AsyncS
         )
     except Exception as e:
         await message.answer(f"Не удалось отправить уведомление пользователю: {e}")
-    
     await message.answer(f"Премиум выдан пользователю {user.name or user.username} на {months} месяцев.")
     await state.clear()
 

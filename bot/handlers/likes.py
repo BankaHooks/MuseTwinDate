@@ -95,11 +95,9 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Вы исчерпали лимит лайков на сегодня (30). Купите премиум!", show_alert=True)
         return
 
-    # Создаём лайк (проверка дубликатов внутри)
     like = await crud.create_like(session, user.id, target.id)
     await crud.increment_likes(session, user)
 
-    # Уведомление о количестве лайков для цели (если изменилось)
     total_likes = await get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
@@ -117,42 +115,45 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         except Exception as e:
             logger.error(f"Failed to send like count notification: {e}")
 
-    # Проверка взаимности и отправка уведомлений
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
         safe_target_name = escape_markdown(target.name or target.username or "Пользователь")
-
-        # Ссылка на пользователя (username или tg://)
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"
-
-        # Отправляем уведомление цели (target) – кто её лайкнул (user)
         try:
             await callback.bot.send_message(
                 target.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\n"
-                f"Напишите ему: {user_link}",
+                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\nНапишите ему: {user_link}",
                 parse_mode="Markdown"
             )
             logger.info(f"Mutual like notification sent to {target.telegram_id}")
         except Exception as e:
             logger.error(f"Failed to send mutual like to target {target.telegram_id}: {e}")
-
-        # Отправляем уведомление пользователю (user) – кто его лайкнул (target)
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_target_name}** понравились друг другу.\n"
-                f"Напишите ему: {target_link}",
+                f"💞 Взаимный лайк! Вы и **{safe_target_name}** понравились друг другу.\nНапишите ему: {target_link}",
                 parse_mode="Markdown"
             )
             logger.info(f"Mutual like notification sent to {user.telegram_id}")
         except Exception as e:
             logger.error(f"Failed to send mutual like to user {user.telegram_id}: {e}")
-
         await callback.answer("Это взаимно! 💞")
     else:
         await callback.answer("Вы лайкнули в ответ!")
 
-    # Обновляем список лайков (удаляем обработанный)
     await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+
+@router.callback_query(F.data.startswith("skip_like_"))
+async def skip_like(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    target_id = int(callback.data.split("_")[2])
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if user:
+        await crud.create_skip(session, user.id, target_id)
+    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+    await callback.answer()
+
+@router.callback_query(F.data == "likes_back")
+async def likes_back(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+    await callback.answer()

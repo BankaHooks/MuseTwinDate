@@ -430,6 +430,15 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     for key, value in update_data.items():
         if hasattr(user, key):
             setattr(user, key, value)
+    # Явное сохранение полей с несовпадающими именами
+    if "genres" in data:
+        user.favorite_genres = data["genres"]
+    if "bands" in data:
+        user.favorite_bands = data["bands"]
+    if "songs" in data:
+        user.favorite_songs = data["songs"]
+    if "goal" in data:
+        user.search_goal = data["goal"]
     if "games" in data:
         user.favorite_games = data["games"]
     await session.commit()

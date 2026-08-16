@@ -1,0 +1,180 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fixes <fixes@example.com>
+Date: Mon, 16 Aug 2026 19:00:00 +0000
+Subject: [PATCH] Critical fixes: browse, ai, admin, likes, profile
+
+---
+ bot/handlers/admin.py   |  1 -
+ bot/handlers/ai.py      | 24 +++++++++++++++---------
+ bot/handlers/browse.py  |  1 -
+ bot/handlers/likes.py   | 20 +++++++++++++++++---
+ bot/handlers/profile.py | 14 ++++++++++----
+ 5 files changed, 43 insertions(+), 17 deletions(-)
+
+diff --git a/bot/handlers/admin.py b/bot/handlers/admin.py
+index 977bc88..fc5f150 100644
+--- a/bot/handlers/admin.py
++++ b/bot/handlers/admin.py
+@@ -212,7 +212,6 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
+         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
+     ])
+     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
+-    await state.clear()
+ 
+ @router.callback_query(F.data.startswith("admin_send_"))
+ async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+diff --git a/bot/handlers/ai.py b/bot/handlers/ai.py
+index d110d20..2e8c2f1 100644
+--- a/bot/handlers/ai.py
++++ b/bot/handlers/ai.py
+@@ -89,7 +89,7 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
+ 
+     candidates_data = [{"id": cand.id, "score": score} for cand, score in scored]
+     await state.update_data(ai_candidates=candidates_data, ai_index=0)
+-    await state.update_data(ai_user=user)
++    await state.update_data(ai_user_id=user.id)
+     await show_ai_candidate(callback.message, state, session, edit=False, bot=callback.bot)
+     await callback.answer()
+ 
+@@ -97,7 +97,8 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
+     data = await state.get_data()
+     candidates = data.get("ai_candidates", [])
+     index = data.get("ai_index", 0)
+-    user = data.get("ai_user")
++    user_id = data.get("ai_user_id")
++    user = await crud.get_user_by_id(session, user_id) if user_id else None
+     if not candidates or index >= len(candidates):
+         text = "Вы просмотрели всех AI-рекомендованных кандидатов."
+         markup = InlineKeyboardMarkup(inline_keyboard=[
+@@ -424,9 +425,10 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
+     await callback.answer()
+ 
+     # Уведомление партнёру
+-    partner_text = (f"🌹 {user.name or 'Кто-то'} пригласил вас на свидание вслепую!\n\n"
++    safe_user_name = escape_markdown(user.name or "Кто-то")
++    partner_text = (f"🌹 {safe_user_name} пригласил вас на свидание вслепую!\n\n"
+                     f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
+-                    "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра...")
++                    "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра...")
+     partner_markup = InlineKeyboardMarkup(inline_keyboard=[
+         [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
+         [InlineKeyboardButton(text="❌ Отменить", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
+@@ -523,12 +525,16 @@ async def reset_history(callback: CallbackQuery, session: AsyncSession):
+         await callback.answer("Вы уже сбрасывали в этом месяце.", show_alert=True)
+         return
+     await session.execute(delete(Skip).where(Skip.user_id == user.id))
+-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
+     user.likes_today = 0
+     user.last_like_date = None
+     user.last_reset = datetime.utcnow()
+     await session.commit()
+     await edit_or_caption(callback, "История лайков и скипов сброшена.", reply_markup=premium_features_keyboard())
+     await callback.answer()
++
++@router.callback_query(F.data.startswith("view_user_"))
++async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
++    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
++    if not user or not user.is_premium:
++        await callback.answer("Доступно только для премиум!", show_alert=True)
++        return
++    user_id = int(callback.data.split("_")[2])
++    user_obj = await crud.get_user_by_id(session, user_id)
++    if not user_obj:
++        await callback.answer("Пользователь не найден.")
++        return
++    from utils.helpers import format_user_card
++    text = format_user_card(user_obj)
++    markup = InlineKeyboardMarkup(inline_keyboard=[
++        [InlineKeyboardButton(text="🔙 Назад", callback_data="gaming_back")]
++    ])
++    if callback.message.photo:
++        await callback.message.edit_media(InputMediaPhoto(media=user_obj.photo_file_id, caption=text), reply_markup=markup)
++    else:
++        await callback.message.edit_text(text, reply_markup=markup)
++    await callback.answer()
+diff --git a/bot/handlers/browse.py b/bot/handlers/browse.py
+index 6fff9a4..7383032 100644
+--- a/bot/handlers/browse.py
++++ b/bot/handlers/browse.py
+@@ -54,7 +54,6 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
+         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
+         return
+     await session.execute(delete(Skip).where(Skip.user_id == user.id))
+-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
+     await session.commit()
+     await state.clear()
+     await callback.message.delete()
+diff --git a/bot/handlers/likes.py b/bot/handlers/likes.py
+index 22d4924..5106cff 100644
+--- a/bot/handlers/likes.py
++++ b/bot/handlers/likes.py
+@@ -84,13 +84,20 @@ async def show_likes_for_message(message: Message, state: FSMContext, session: A
+ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+     target_id = int(callback.data.split("_")[1])
+     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
++    if not user:
++        await callback.answer("Зарегистрируйтесь через /start")
++        return
+     target = await crud.get_user_by_id(session, target_id)
+     if not target:
+         await callback.answer("Пользователь не найден.")
+         return
++    if not await crud.can_like(session, user):
++        await callback.answer("Вы исчерпали лимит лайков на сегодня (30). Купите премиум!", show_alert=True)
++        return
+ 
+     # Создаём лайк (проверка дубликатов внутри)
+     like = await crud.create_like(session, user.id, target.id)
++    await crud.increment_likes(session, user)
+ 
+     # Уведомление о количестве лайков для цели (если изменилось)
+     total_likes = await get_likes_count(session, target.id)
+@@ -115,3 +122,10 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
+     # Обновляем список лайков (удаляем обработанный)
+     await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+     await callback.answer()
++
++@router.callback_query(F.data.startswith("skip_like_"))
++async def skip_like(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
++    target_id = int(callback.data.split("_")[2])
++    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
++    if user:
++        await crud.create_skip(session, user.id, target_id)
++    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
++    await callback.answer()
++
++@router.callback_query(F.data == "likes_back")
++async def likes_back(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
++    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
++    await callback.answer()
+diff --git a/bot/handlers/profile.py b/bot/handlers/profile.py
+index 8cf8373..d6942c5 100644
+--- a/bot/handlers/profile.py
++++ b/bot/handlers/profile.py
+@@ -321,6 +321,14 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
+         if key in data:
+             update_data[key] = data[key]
+     if extra:
+         update_data.update(extra)
+     for key, value in update_data.items():
+         if hasattr(user, key):
+             setattr(user, key, value)
+-    if "games" in data:
+-        user.favorite_games = data["games"]
++    # Явное сохранение полей с несовпадающими именами
++    if "genres" in data:
++        user.favorite_genres = data["genres"]
++    if "bands" in data:
++        user.favorite_bands = data["bands"]
++    if "songs" in data:
++        user.favorite_songs = data["songs"]
++    if "goal" in data:
++        user.search_goal = data["goal"]
++    if "games" in data:
++        user.favorite_games = data["games"]
+     await session.commit()
+     await state.clear()
+     if isinstance(event, Message):
+         await event.reply("Профиль обновлён!")
+-- 
+2.34.1

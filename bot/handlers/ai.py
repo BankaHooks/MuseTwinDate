@@ -22,7 +22,6 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
-# Список популярных песен (используется для свидания вслепую)
 POPULAR_SONGS = [
     ("Queen", "Bohemian Rhapsody"),
     ("John Lennon", "Imagine"),
@@ -201,7 +200,7 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
 
     candidates_data = [{"id": cand.id, "score": score} for cand, score in scored]
     await state.update_data(ai_candidates=candidates_data, ai_index=0)
-    await state.update_data(ai_user=user)
+    await state.update_data(ai_user_id=user.id)
     await show_ai_candidate(callback.message, state, session, edit=False, bot=callback.bot)
     await callback.answer()
 
@@ -209,7 +208,8 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
     data = await state.get_data()
     candidates = data.get("ai_candidates", [])
     index = data.get("ai_index", 0)
-    user = data.get("ai_user")
+    user_id = data.get("ai_user_id")
+    user = await crud.get_user_by_id(session, user_id) if user_id else None
     if not candidates or index >= len(candidates):
         text = "Вы просмотрели всех AI-рекомендованных кандидатов."
         markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -232,16 +232,7 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
 
     from utils.helpers import format_user_card
     text = format_user_card(candidate, score)
-
     # AI-пояснение временно отключено (функция get_match_explanation не реализована)
-    # if config.GIGACHAT_API_KEY and user:
-    #     try:
-    #         explanation = await get_match_explanation(user, candidate, score)
-    #         if explanation:
-    #             text += f"\n\n🤖 AI-пояснение: {explanation}"
-    #     except Exception as e:
-    #         logger.error(f"AI explanation error: {e}")
-
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"ai_like_{candidate_id}"),
          InlineKeyboardButton(text="⏭️ Скип", callback_data=f"ai_skip_{candidate_id}")],
@@ -385,7 +376,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     await edit_or_caption(callback, text, reply_markup=markup, parse_mode="Markdown")
     await callback.answer()
 
-    partner_text = (f"🌹 {user.name or 'Кто-то'} пригласил вас на свидание вслепую!\n\n"
+    safe_user_name = escape_markdown(user.name or "Кто-то")
+    partner_text = (f"🌹 {safe_user_name} пригласил вас на свидание вслепую!\n\n"
                     f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
                     "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра...")
     partner_markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -544,6 +536,10 @@ async def no_username(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("view_user_"))
 async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user or not user.is_premium:
+        await callback.answer("Доступно только для премиум!", show_alert=True)
+        return
     user_id = int(callback.data.split("_")[2])
     user_obj = await crud.get_user_by_id(session, user_id)
     if not user_obj:
@@ -572,7 +568,6 @@ async def reset_history(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Вы уже сбрасывали в этом месяце.", show_alert=True)
         return
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
     user.likes_today = 0
     user.last_like_date = None
     user.last_reset = datetime.utcnow()

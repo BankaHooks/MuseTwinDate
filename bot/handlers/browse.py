@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 async def send_candidate(target, candidate, score, state: FSMContext, session: AsyncSession, delete_old=True):
-    """Отправляет анкету, удаляя старое сообщение"""
     if delete_old and hasattr(target, 'delete'):
         try:
             await target.delete()
@@ -64,7 +63,6 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
-        # Удаляем старое сообщение и отправляем новое (без фото)
         try:
             await target.delete()
         except:
@@ -100,8 +98,8 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
+    # Удаляем только скипы, лайки НЕ удаляем
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
     await session.commit()
     await state.clear()
     await callback.message.delete()
@@ -194,7 +192,6 @@ async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_envelope")]
     ])
-    # Для конверта используем редактирование, так как это всегда текущее сообщение с фото или текстом.
     if callback.message.photo:
         await callback.message.edit_caption(
             caption="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
