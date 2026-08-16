@@ -84,13 +84,20 @@ async def show_likes_for_message(message: Message, state: FSMContext, session: A
 async def like_back_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     target_id = int(callback.data.split("_")[1])
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
     target = await crud.get_user_by_id(session, target_id)
     if not target:
         await callback.answer("Пользователь не найден.")
         return
+    if not await crud.can_like(session, user):
+        await callback.answer("Вы исчерпали лимит лайков на сегодня (30). Купите премиум!", show_alert=True)
+        return
 
     # Создаём лайк (проверка дубликатов внутри)
     like = await crud.create_like(session, user.id, target.id)
+    await crud.increment_likes(session, user)
 
     # Уведомление о количестве лайков для цели (если изменилось)
     total_likes = await get_likes_count(session, target.id)

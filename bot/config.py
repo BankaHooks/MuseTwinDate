@@ -17,5 +17,6 @@ class Config:
     MINI_APP_URL = os.getenv("MINI_APP_URL", "https://bankahooks.github.io/MuseTwinDate/")
     GIGACHAT_API_KEY = os.getenv("GIGACHAT_API_KEY")
     GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat")
+    GIGACHAT_CA_BUNDLE_FILE = os.getenv("GIGACHAT_CA_BUNDLE_FILE")
     VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN")
 config = Config()

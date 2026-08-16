@@ -118,7 +118,7 @@ async def referral_reminder_sender():
                 for user in users:
                     try:
                         if not user.referral_code:
-                            user.referral_code = await crud.generate_referral_code(user.telegram_id)
+                            user.referral_code = await crud.generate_referral_code(session, user.telegram_id)
                             await session.commit()
                         link = f"t.me/MuseTwin_bot?start={user.referral_code}"
                         await bot.send_message(

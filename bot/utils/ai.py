@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 client = GigaChat(
     credentials=config.GIGACHAT_API_KEY,
-    verify_ssl_certs=False,
+    verify_ssl_certs=True,
+    ca_bundle_file=config.GIGACHAT_CA_BUNDLE_FILE,
     model=config.GIGACHAT_MODEL
 )
 
