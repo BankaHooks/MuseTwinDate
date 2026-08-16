@@ -195,3 +195,26 @@ async def update_like_notification_count(session: AsyncSession, user: User, coun
 async def update_last_activity(session: AsyncSession, user: User):
     user.last_activity = datetime.utcnow()
     await session.commit()
+
+from sqlalchemy import func
+
+async def get_random_bot(session: AsyncSession, exclude_user_ids: list = None) -> Optional[User]:
+    stmt = select(User).where(
+        User.telegram_id < 0,
+        User.is_banned == False,
+        User.is_hidden == False
+    )
+    if exclude_user_ids:
+        stmt = stmt.where(User.id.notin_(exclude_user_ids))
+    stmt = stmt.order_by(func.random()).limit(1)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+async def get_random_real_user(session: AsyncSession) -> Optional[User]:
+    stmt = select(User).where(
+        User.telegram_id > 0,
+        User.is_banned == False
+    )
+    stmt = stmt.order_by(func.random()).limit(1)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()

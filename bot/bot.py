@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
@@ -12,8 +13,7 @@ from config import config
 from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
-from handlers import start, menu, browse, likes, profile, premium, report, admin
-from handlers import ai
+from handlers import start, menu, browse, likes, profile, premium, report, admin, ai
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -27,9 +27,6 @@ class DBSessionMiddleware(BaseMiddleware):
     ) -> Any:
         async with AsyncSessionLocal() as session:
             data["session"] = session
-            tg_user = getattr(event.event, "from_user", None)
-            if tg_user:
-                data["user"] = await crud.get_user_by_telegram_id(session, tg_user.id)
             return await handler(event, data)
 
 class ActivityMiddleware(BaseMiddleware):
@@ -80,6 +77,32 @@ async def inactivity_notifier():
         except Exception as e:
             logger.error(f"Error in inactivity_notifier: {e}")
 
+async def fake_activity_simulator():
+    while True:
+        await asyncio.sleep(random.randint(1800, 7200))  # 30 минут – 2 часа
+        try:
+            async with AsyncSessionLocal() as session:
+                bot = await crud.get_random_bot(session)
+                if not bot:
+                    continue
+                user = await crud.get_random_real_user(session)
+                if not user:
+                    continue
+                existing = await crud.get_like_between(session, bot.id, user.id)
+                if existing:
+                    continue
+                like = await crud.create_like(session, bot.id, user.id)
+                if like:
+                    try:
+                        await bot.send_message(
+                            user.telegram_id,
+                            f"🎵 У вас новый лайк от пользователя {bot.name or bot.username}!"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send fake like notification: {e}")
+        except Exception as e:
+            logger.error(f"Error in fake_activity_simulator: {e}")
+
 async def main():
     global bot
     storage = MemoryStorage()
@@ -109,6 +132,7 @@ async def main():
     )
     await on_startup()
     asyncio.create_task(inactivity_notifier())
+    asyncio.create_task(fake_activity_simulator())
     if config.USE_WEBHOOK:
         await bot.set_webhook(
             url=config.WEBHOOK_URL,
