@@ -11,13 +11,9 @@ router = Router()
 
 @router.callback_query(F.data == "premium")
 async def premium_show(callback: CallbackQuery, session: AsyncSession):
-    await show_premium(callback.message, callback.from_user.id, session, delete_old=True)
-    await callback.answer()
-
-async def show_premium(target: Message, user_id: int, session: AsyncSession, delete_old: bool = False):
-    user = await crud.get_user_by_telegram_id(session, user_id)
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
-        await target.answer("Зарегистрируйтесь через /start")
+        await callback.answer("Зарегистрируйтесь через /start")
         return
     status = "Активен" if user.is_premium else "Неактивен"
     expiry = f" (до {user.premium_expiry.strftime('%Y-%m-%d')})" if user.premium_expiry else ""
@@ -28,16 +24,15 @@ async def show_premium(target: Message, user_id: int, session: AsyncSession, del
         [InlineKeyboardButton(text="Доступные премиум-функции", callback_data="show_premium_features")],
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ])
-    if delete_old:
-        await target.delete()
-    await target.answer(text, reply_markup=kb)
-
-async def show_premium_for_message(message: Message, session: AsyncSession):
-    await show_premium(message, message.from_user.id, session, delete_old=False)
+    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("premium_1") | F.data.startswith("premium_3"))
 async def premium_plan(callback: CallbackQuery, session: AsyncSession):
     plan_key = callback.data.split("_")[1]
+    if plan_key not in ["1", "3"]:
+        await callback.answer("Неверный план.")
+        return
     plan = PLANS.get(plan_key)
     if not plan:
         await callback.answer("Неверный план.")

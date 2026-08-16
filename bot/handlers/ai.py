@@ -1,15 +1,16 @@
-import random
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 from datetime import datetime, timedelta
+import random
 from database import crud
 from database.models import Skip, Like
 from utils.ai import generate_icebreakers, analyze_music_taste, get_match_recommendation, generate_blind_date_questions
 from keyboards.inline import premium_features_keyboard
 from keyboards.reply import main_reply_keyboard
+from utils.security import escape_markdown
 
 router = Router()
 
@@ -125,12 +126,14 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     else:
         song = random.choice(POPULAR_SONGS)
     questions = await generate_blind_date_questions(song, user, partner)
+    safe_song = escape_markdown(song)
+    partner_name = escape_markdown(partner.name or "партнёром")
     if partner.username:
         partner_link = f"@{partner.username}"
     else:
         partner_link = f"[профиль](tg://user?id={partner.telegram_id})"
-    text = f"🌹 Свидание вслепую с {partner.name or 'партнёром'}!\n\n"
-    text += f"🎵 Общий трек для прослушивания: **{song}**\n\n"
+    text = f"🌹 Свидание вслепую с {partner_name}!\n\n"
+    text += f"🎵 Общий трек для прослушивания: **{safe_song}**\n\n"
     text += "Обсудите эти вопросы после прослушивания:\n"
     for i, q in enumerate(questions, 1):
         text += f"{i}. {q}\n"

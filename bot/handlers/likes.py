@@ -8,6 +8,7 @@ from database.crud import get_likes_count
 from keyboards.inline import likes_action_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import format_user_card
+from utils.security import escape_markdown
 
 router = Router()
 
@@ -108,12 +109,14 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         except:
             pass
     if like.is_mutual:
+        safe_user_name = escape_markdown(user.name or user.username)
+        safe_target_name = escape_markdown(target.name or target.username)
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"
         try:
             await callback.bot.send_message(
                 target.telegram_id,
-                f"Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
+                f"Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\n"
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
@@ -122,7 +125,7 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"Взаимный лайк! Вы и {target.name or target.username} понравились друг другу.\n"
+                f"Взаимный лайк! Вы и {safe_target_name} понравились друг другу.\n"
                 f"Напишите ему: {target_link}",
                 parse_mode="Markdown"
             )

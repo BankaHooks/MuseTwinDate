@@ -12,6 +12,7 @@ from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
 from utils.helpers import format_user_card
 from utils.matching import pick_candidate_simple
+from utils.security import escape_markdown
 
 router = Router()
 
@@ -113,12 +114,14 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             pass
 
     if like.is_mutual:
+        safe_user_name = escape_markdown(user.name or user.username)
+        safe_candidate_name = escape_markdown(candidate.name or candidate.username)
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
         try:
             await callback.bot.send_message(
                 candidate.telegram_id,
-                f"Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
+                f"Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\n"
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
@@ -127,7 +130,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"Взаимный лайк! Вы и {candidate.name or candidate.username} понравились друг другу.\n"
+                f"Взаимный лайк! Вы и {safe_candidate_name} понравились друг другу.\n"
                 f"Напишите ему: {candidate_link}",
                 parse_mode="Markdown"
             )
@@ -170,6 +173,10 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
 @router.callback_query(F.data.startswith("reportreason_"))
 async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     reason = callback.data.split("_", 1)[1]
+    allowed = ["spam", "inappropriate", "fake", "other"]
+    if reason not in allowed:
+        await callback.answer("Некорректная причина.", show_alert=True)
+        return
     data = await state.get_data()
     target_id = data.get("report_target")
     if not target_id:

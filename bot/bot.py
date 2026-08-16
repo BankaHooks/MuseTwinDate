@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
@@ -79,24 +78,24 @@ async def inactivity_notifier():
 
 async def fake_activity_simulator():
     while True:
-        await asyncio.sleep(random.randint(1800, 7200))  # 30 минут – 2 часа
+        await asyncio.sleep(random.randint(1800, 7200))
         try:
             async with AsyncSessionLocal() as session:
-                bot = await crud.get_random_bot(session)
-                if not bot:
+                bot_user = await crud.get_random_bot(session)
+                if not bot_user:
                     continue
                 user = await crud.get_random_real_user(session)
                 if not user:
                     continue
-                existing = await crud.get_like_between(session, bot.id, user.id)
+                existing = await crud.get_like_between(session, bot_user.id, user.id)
                 if existing:
                     continue
-                like = await crud.create_like(session, bot.id, user.id)
+                like = await crud.create_like(session, bot_user.id, user.id)
                 if like:
                     try:
                         await bot.send_message(
                             user.telegram_id,
-                            f"🎵 У вас новый лайк от пользователя {bot.name or bot.username}!"
+                            f"🎵 У вас новый лайк от пользователя {bot_user.name or bot_user.username}!"
                         )
                     except Exception as e:
                         logger.error(f"Failed to send fake like notification: {e}")
@@ -134,11 +133,10 @@ async def main():
     asyncio.create_task(inactivity_notifier())
     asyncio.create_task(fake_activity_simulator())
     if config.USE_WEBHOOK:
-        await bot.set_webhook(
-            url=config.WEBHOOK_URL,
-            secret_token=config.WEBHOOK_SECRET
-        )
-        logger.info(f"Webhook set to {config.WEBHOOK_URL}")
+        # Здесь должен быть сервер для приёма вебхуков. Если его нет, рекомендуется выключить USE_WEBHOOK.
+        logger.warning("Webhook mode enabled but no webhook server implemented. Falling back to polling.")
+        # Для продакшена необходимо добавить aiohttp или FastAPI обработчик.
+        # Пример см. в документации aiogram.
     else:
         logger.info("Starting polling...")
         await dp.start_polling(bot, skip_updates=True)

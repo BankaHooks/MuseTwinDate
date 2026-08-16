@@ -24,6 +24,13 @@ WELCOME_TEXT = (
     "для этого напишите в лс @danhooks"
 )
 
+def truncate_field(text: str, max_len: int = 500) -> str:
+    if not text:
+        return text
+    if len(text) > max_len:
+        return text[:max_len].strip()
+    return text
+
 @router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
@@ -44,7 +51,11 @@ async def welcome_start_registration(callback: CallbackQuery, state: FSMContext)
 
 @router.message(Registration.name)
 async def reg_name(message: Message, state: FSMContext):
-    name = None if message.text.lower() == "пропустить" else message.text
+    raw = message.text
+    if raw.lower() == "пропустить":
+        name = None
+    else:
+        name = truncate_field(raw, 100)
     await state.update_data(name=name)
     await state.set_state(Registration.gender)
     await message.answer("Укажите ваш пол:", reply_markup=gender_choose_keyboard())
@@ -90,7 +101,8 @@ async def reg_genres_done(callback: CallbackQuery, state: FSMContext):
     if not genres:
         await callback.answer("Выберите хотя бы один жанр.", show_alert=True)
         return
-    await state.update_data(genres=", ".join(genres))
+    joined = ", ".join(genres)
+    await state.update_data(genres=truncate_field(joined, 500))
     await state.set_state(Registration.bands)
     await callback.message.edit_text("Введите ваши любимые группы (до 5, разделённых запятой):\n(или 'Пропустить')")
     await callback.answer()
@@ -105,13 +117,14 @@ async def reg_bands(message: Message, state: FSMContext):
         if len(bands) > 5:
             await message.answer("Можно ввести не более 5 групп. Попробуйте снова или отправьте 'Пропустить'.")
             return
-        await state.update_data(bands=", ".join(bands))
+        joined = ", ".join(bands)
+        await state.update_data(bands=truncate_field(joined, 500))
     await state.set_state(Registration.songs)
     await message.answer("Введите ваши любимые песни (можно несколько, через запятую):\n(или 'Пропустить')")
 
 @router.message(Registration.songs)
 async def reg_songs(message: Message, state: FSMContext):
-    songs = None if message.text.lower() == "пропустить" else message.text
+    songs = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
     await state.update_data(songs=songs)
     await state.set_state(Registration.goal)
     await message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
@@ -164,7 +177,8 @@ async def reg_interests_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     selected = data.get("interests_list", [])
     if selected:
-        await state.update_data(interests=", ".join(selected))
+        joined = ", ".join(selected)
+        await state.update_data(interests=truncate_field(joined, 500))
     else:
         await state.update_data(interests=None)
     await state.set_state(Registration.preferred_gender)
@@ -181,7 +195,8 @@ async def reg_preferred_gender(callback: CallbackQuery, state: FSMContext):
 
 @router.message(Registration.bio)
 async def reg_bio(message: Message, state: FSMContext):
-    await state.update_data(bio=message.text)
+    bio = truncate_field(message.text, 500)
+    await state.update_data(bio=bio)
     await state.set_state(Registration.photo)
     await message.answer("Отправьте фото (или 'Пропустить')")
 

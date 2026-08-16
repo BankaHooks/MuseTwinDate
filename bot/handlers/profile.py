@@ -14,8 +14,16 @@ from keyboards.inline import (
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
 from utils.media import save_photo
+from utils.security import escape_markdown
 
 router = Router()
+
+def truncate_field(text: str, max_len: int = 500) -> str:
+    if not text:
+        return text
+    if len(text) > max_len:
+        return text[:max_len].strip()
+    return text
 
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
@@ -183,6 +191,7 @@ async def edit_genres_done(callback: CallbackQuery, state: FSMContext, session: 
         await callback.answer("Выберите хотя бы один жанр.", show_alert=True)
         return
     genre_str = ", ".join(genres)
+    genre_str = truncate_field(genre_str, 500)
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, favorite_genres=genre_str)
     await state.clear()
@@ -200,6 +209,7 @@ async def edit_bands(message: Message, state: FSMContext, session: AsyncSession)
             await message.answer("Можно ввести не более 5 групп. Попробуйте снова или отправьте 'Пропустить'.")
             return
         bands = ", ".join(bands)
+        bands = truncate_field(bands, 500)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, favorite_bands=bands)
     await state.clear()
@@ -254,6 +264,8 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
     data = await state.get_data()
     selected = data.get("interests_list", [])
     interest_str = ", ".join(selected) if selected else None
+    if interest_str:
+        interest_str = truncate_field(interest_str, 500)
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     await crud.update_user(session, user, interests=interest_str)
     await state.clear()
@@ -280,7 +292,10 @@ async def process_edit_preferred_gender(callback: CallbackQuery, state: FSMConte
 
 @router.message(ProfileEdit.name)
 async def edit_name(message: Message, state: FSMContext, session: AsyncSession):
-    name = None if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() == "пропустить":
+        name = None
+    else:
+        name = truncate_field(message.text, 100)
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     await crud.update_user(session, user, name=name)
     await state.clear()
@@ -307,7 +322,7 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
 @router.message(ProfileEdit.songs)
 async def edit_songs(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    songs = None if message.text.lower() == "пропустить" else message.text
+    songs = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
     await crud.update_user(session, user, favorite_songs=songs)
     await state.clear()
     await message.answer("Песни обновлены", reply_markup=main_reply_keyboard())
@@ -315,7 +330,8 @@ async def edit_songs(message: Message, state: FSMContext, session: AsyncSession)
 @router.message(ProfileEdit.bio)
 async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    await crud.update_user(session, user, bio=message.text)
+    bio = truncate_field(message.text, 500)
+    await crud.update_user(session, user, bio=bio)
     await state.clear()
     await message.answer("Био обновлено", reply_markup=main_reply_keyboard())
 
