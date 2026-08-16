@@ -14,6 +14,7 @@ from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
 from handlers import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope
+from handlers import vk_import
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -130,6 +131,7 @@ async def main():
         admin.router,
         ai.router,
         horoscope.router,
+        vk_import.router,
     )
     await on_startup()
     asyncio.create_task(inactivity_notifier())

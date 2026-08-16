@@ -97,6 +97,7 @@ def profile_edit_keyboard():
         [InlineKeyboardButton(text="Обновить рекомендации", callback_data="refresh_recommendations")],
         [InlineKeyboardButton(text="Перезаполнить анкету заново", callback_data="reset_profile")],
         [InlineKeyboardButton(text="Назад", callback_data="profile_back")]
+        [InlineKeyboardButton(text="Импорт из VK", callback_data="import_vk")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

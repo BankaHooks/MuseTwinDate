@@ -4,12 +4,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-ZODIAC_SIGNS = [
-    "Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева",
-    "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"
-]
-
-SIGN_EN = {
+ZODIAC_SIGNS = {
     "Овен": "aries",
     "Телец": "taurus",
     "Близнецы": "gemini",
@@ -25,29 +20,48 @@ SIGN_EN = {
 }
 
 async def get_daily_horoscope(sign_ru: str) -> Optional[str]:
-    sign_en = SIGN_EN.get(sign_ru)
+    sign_en = ZODIAC_SIGNS.get(sign_ru)
     if not sign_en:
         return None
-    url = f"https://aztro.sameerkumar.website/?sign={sign_en}&day=today"
+
+    # Первый API (aztro)
+    url1 = f"https://aztro.sameerkumar.website/?sign={sign_en}&day=today"
+    # Второй API (альтернативный)
+    url2 = f"https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign={sign_en}&day=TODAY"
+
+    # Пробуем первый
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url) as resp:
+            async with session.post(url1) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    # Формируем красивое сообщение
-                    message = (
-                        f"🔮 Гороскоп для {sign_ru} на сегодня:\n\n"
-                        f"{data.get('description', 'Нет описания')}\n\n"
-                        f"❤️ Любовь: {data.get('love', 'Нет данных')}\n"
-                        f"💼 Карьера: {data.get('career', 'Нет данных')}\n"
-                        f"💰 Финансы: {data.get('money', 'Нет данных')}\n"
-                        f"🍀 Удача: {data.get('luck', 'Нет данных')}\n"
-                        f"📅 Дата: {data.get('current_date', '')}"
-                    )
-                    return message
-                else:
-                    logger.error(f"Horoscope API error: {resp.status}")
-                    return None
+                    return format_horoscope(sign_ru, data)
     except Exception as e:
-        logger.error(f"Horoscope request failed: {e}")
-        return None
+        logger.error(f"Horoscope API 1 failed: {e}")
+
+    # Пробуем второй
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url2) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # У второго API другой формат
+                    horoscope_text = data.get("data", {}).get("horoscope_data", "")
+                    if horoscope_text:
+                        return f"🔮 Гороскоп для {sign_ru} на сегодня:\n\n{horoscope_text}"
+    except Exception as e:
+        logger.error(f"Horoscope API 2 failed: {e}")
+
+    return None
+
+def format_horoscope(sign_ru, data):
+    message = (
+        f"🔮 Гороскоп для {sign_ru} на сегодня:\n\n"
+        f"{data.get('description', 'Нет описания')}\n\n"
+        f"❤️ Любовь: {data.get('love', 'Нет данных')}\n"
+        f"💼 Карьера: {data.get('career', 'Нет данных')}\n"
+        f"💰 Финансы: {data.get('money', 'Нет данных')}\n"
+        f"🍀 Удача: {data.get('luck', 'Нет данных')}\n"
+        f"📅 Дата: {data.get('current_date', '')}"
+    )
+    return message
