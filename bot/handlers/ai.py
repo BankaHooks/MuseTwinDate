@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 from datetime import datetime, timedelta
 import random
+import asyncio
 from database import crud
 from database.models import Skip, Like, BlindDate
 from utils.ai import generate_icebreakers, analyze_music_taste, get_match_recommendation, generate_blind_date_questions
@@ -161,6 +162,27 @@ POPULAR_SONGS = [
     ("Queen", "Fat Bottomed Girls")
 ]
 
+async def cancel_blind_date_after_timeout(blind_date_id: int, bot, session_maker):
+    await asyncio.sleep(600)
+    async with session_maker() as session:
+        blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
+        if not blind_date:
+            return
+        if blind_date.user1_listened and blind_date.user2_listened:
+            return
+        user1 = await crud.get_user_by_id(session, blind_date.user1_id)
+        user2 = await crud.get_user_by_id(session, blind_date.user2_id)
+        await session.delete(blind_date)
+        await session.commit()
+        try:
+            await bot.send_message(user1.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 минут). Попробуйте снова позже.")
+        except:
+            pass
+        try:
+            await bot.send_message(user2.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 минут). Попробуйте снова позже.")
+        except:
+            pass
+
 @router.callback_query(F.data == "show_premium_features")
 async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -246,7 +268,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     blind_date_obj = await crud.create_blind_date(session, user.id, partner.id, song, artist)
 
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")]
+        [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
+        [InlineKeyboardButton(text="❌ Отменить свидание", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
     ])
 
     safe_artist = escape_markdown(artist)
@@ -255,7 +278,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
             f"🎵 Общий трек для прослушивания: **{safe_artist} — {safe_song}**\n\n"
             "Прослушайте данную музыку и затем обсудите с партнёром.\n"
             "Когда прослушаете, нажмите кнопку ниже.\n\n"
-            "⏳ Ожидаем, пока партнёр тоже прослушает...")
+            "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
+            "⏱️ Свидание будет автоматически отменено через 10 минут, если второй участник не прослушает трек.")
 
     try:
         await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
@@ -265,7 +289,8 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
             f"🎵 Общий трек: {artist} — {song}\n\n"
             "Прослушайте данную музыку и затем обсудите с партнёром.\n"
             "Когда прослушаете, нажмите кнопку ниже.\n\n"
-            "⏳ Ожидаем, пока партнёр тоже прослушает...",
+            "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
+            "⏱️ Свидание будет автоматически отменено через 10 минут, если второй участник не прослушает трек.",
             reply_markup=markup
         )
     await callback.answer()
@@ -273,9 +298,11 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     partner_text = (f"🌹 Пользователь {user.name or 'кто-то'} пригласил вас на свидание вслепую!\n\n"
                     f"🎵 Общий трек для прослушивания: **{safe_artist} — {safe_song}**\n\n"
                     "Прослушайте и нажмите кнопку ниже, чтобы подтвердить.\n\n"
-                    "⏳ Ожидаем, пока партнёр тоже прослушает...")
+                    "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
+                    "⏱️ Свидание будет автоматически отменено через 10 минут, если вы не подтвердите прослушивание.")
     partner_markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")]
+        [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
+        [InlineKeyboardButton(text="❌ Отменить свидание", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
     ])
     try:
         await callback.bot.send_message(partner.telegram_id, partner_text, reply_markup=partner_markup, parse_mode="Markdown")
@@ -284,8 +311,11 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
                                         f"🌹 Пользователь {user.name or 'кто-то'} пригласил вас на свидание вслепую!\n\n"
                                         f"🎵 Общий трек: {artist} — {song}\n\n"
                                         "Прослушайте и нажмите кнопку ниже.\n\n"
-                                        "⏳ Ожидаем, пока партнёр тоже прослушает...",
+                                        "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
+                                        "⏱️ Свидание будет автоматически отменено через 10 минут, если вы не подтвердите прослушивание.",
                                         reply_markup=partner_markup)
+
+    asyncio.create_task(cancel_blind_date_after_timeout(blind_date_obj.id, callback.bot, session.bind))
 
 @router.callback_query(F.data.startswith("blind_date_listen_"))
 async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
@@ -350,6 +380,43 @@ async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
         await callback.message.answer("🎉 Свидание вслепую завершено! Контакты отправлены.")
     else:
         await callback.message.answer("✅ Вы подтвердили прослушивание. Ожидаем партнёра...")
+
+@router.callback_query(F.data.startswith("blind_date_cancel_"))
+async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
+    try:
+        blind_date_id = int(callback.data.split("_")[-1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный идентификатор.", show_alert=True)
+        return
+
+    blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
+    if not blind_date:
+        await callback.answer("Это свидание уже неактивно.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    if blind_date.user1_id != user_id and blind_date.user2_id != user_id:
+        await callback.answer("Вы не участник этого свидания.", show_alert=True)
+        return
+
+    user1 = await crud.get_user_by_id(session, blind_date.user1_id)
+    user2 = await crud.get_user_by_id(session, blind_date.user2_id)
+
+    await session.delete(blind_date)
+    await session.commit()
+
+    try:
+        await callback.bot.send_message(user1.telegram_id, "❌ Свидание вслепую отменено другим участником.")
+    except:
+        pass
+    try:
+        await callback.bot.send_message(user2.telegram_id, "❌ Свидание вслепую отменено другим участником.")
+    except:
+        pass
+
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer("Свидание отменено.")
+    await callback.answer()
 
 @router.callback_query(F.data == "reset_history")
 async def reset_history(callback: CallbackQuery, session: AsyncSession):

@@ -39,6 +39,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
         await target_message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
+        await state.clear()
         return
 
     await state.set_state(Browse.candidate_id)
@@ -151,6 +152,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
     else:
         await callback.answer("Лайк поставлен!")
 
+    await state.update_data(candidate_id=None)
     await show_next(callback, state, session)
 
 @router.callback_query(F.data == "skip", Browse.candidate_id)
@@ -160,6 +162,7 @@ async def skip_callback(callback: CallbackQuery, state: FSMContext, session: Asy
     if candidate_id:
         user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
         await crud.create_skip(session, user.id, candidate_id)
+    await state.update_data(candidate_id=None)
     await show_next(callback, state, session)
 
 @router.callback_query(F.data == "send_envelope", Browse.candidate_id)
