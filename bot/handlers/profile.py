@@ -9,7 +9,8 @@ from database import crud
 from database.models import User
 from keyboards.inline import (
     profile_main_keyboard, profile_edit_keyboard, gender_choose_keyboard,
-    genre_choose_keyboard, goal_keyboard, interest_category_keyboard,
+    genre_category_keyboard, genre_items_keyboard,
+    goal_keyboard, interest_category_keyboard,
     interest_items_keyboard, games_category_keyboard, games_items_keyboard,
     preferred_gender_keyboard, profile_search_settings_keyboard
 )
@@ -73,7 +74,7 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
         "name": ("Введите новое имя:", ProfileEditState.name),
         "age": ("Введите новый возраст (16-99):", ProfileEditState.age),
         "city": ("Введите новый город:", ProfileEditState.city),
-        "genres": ("Выберите новые жанры:", ProfileEditState.genres),
+        "genres": ("Выберите категорию жанров:", ProfileEditState.genres),
         "bands": ("Введите новые группы (до 5, через запятую):", ProfileEditState.bands),
         "songs": ("Введите новые песни (до 500 символов):", ProfileEditState.songs),
         "goal": ("Выберите новую цель:", ProfileEditState.goal),
@@ -89,7 +90,7 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
     await state.set_state(state_name)
     await state.update_data(edit_field=field)
     if field == "genres":
-        await edit_or_caption(callback, prompt, reply_markup=genre_choose_keyboard())
+        await edit_or_caption(callback, "Выберите категорию жанров:", reply_markup=genre_category_keyboard())
     elif field == "goal":
         await edit_or_caption(callback, prompt, reply_markup=goal_keyboard())
     elif field == "interests":
@@ -139,26 +140,52 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
     await state.update_data(city=city)
     await finish_edit(message, state, session)
 
-@router.callback_query(F.data.startswith("genre_add_"), StateFilter(ProfileEditState.genres))
-async def edit_genre_add(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 1)[1]
+# === Обработчики для жанров (категории) ===
+@router.callback_query(F.data.startswith("genre_cat_"), StateFilter(ProfileEditState.genres))
+async def edit_genre_category(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_", 1)[1]
+    category = category.replace("_", " ").strip()
     data = await state.get_data()
-    genres = data.get("genres", [])
-    if genre not in genres:
-        genres.append(genre)
-        await state.update_data(genres=genres)
-        await callback.answer(f"Добавлено: {genre}")
+    selected = data.get("selected_genres", [])
+    await state.update_data(current_genre_category=category)
+    markup = genre_items_keyboard(category, selected)
+    await edit_or_caption(callback, f"Выберите жанры в категории «{category}»:", reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("genre_item_"), StateFilter(ProfileEditState.genres))
+async def edit_genre_item(callback: CallbackQuery, state: FSMContext):
+    genre = callback.data.split("_", 1)[1]
+    genre = genre.replace("_", " ")
+    data = await state.get_data()
+    selected = data.get("selected_genres", [])
+    if genre in selected:
+        selected.remove(genre)
+        await callback.answer(f"Удалено: {genre}")
     else:
-        await callback.answer("Уже добавлено")
+        if len(selected) >= 15:
+            await callback.answer("Максимум 15 жанров.", show_alert=True)
+            return
+        selected.append(genre)
+        await callback.answer(f"Добавлено: {genre}")
+    await state.update_data(selected_genres=selected)
+    category = data.get("current_genre_category", "")
+    if category:
+        markup = genre_items_keyboard(category, selected)
+        await callback.message.edit_reply_markup(reply_markup=markup)
+
+@router.callback_query(F.data == "genre_back", StateFilter(ProfileEditState.genres))
+async def edit_genre_back(callback: CallbackQuery, state: FSMContext):
+    await edit_or_caption(callback, "Выберите категорию жанров:", reply_markup=genre_category_keyboard())
+    await callback.answer()
 
 @router.callback_query(F.data == "genres_done", StateFilter(ProfileEditState.genres))
 async def edit_genres_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
-    genres = data.get("genres", [])
-    if not genres:
+    selected = data.get("selected_genres", [])
+    if not selected:
         await callback.answer("Выберите хотя бы один жанр!", show_alert=True)
         return
-    await state.update_data(genres=", ".join(genres))
+    await state.update_data(genres=", ".join(selected))
     await finish_edit(callback, state, session)
 
 @router.message(ProfileEditState.bands)
@@ -195,6 +222,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     await state.update_data(goal=goal_map.get(goal, goal))
     await finish_edit(callback, state, session)
 
+# === Обработчики для интересов ===
 @router.callback_query(F.data.startswith("cat_"), StateFilter(ProfileEditState.interests))
 async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data.split("_", 1)[1]
@@ -225,11 +253,7 @@ async def edit_interest_item(callback: CallbackQuery, state: FSMContext):
     category = data.get("current_category", "")
     if category:
         markup = interest_items_keyboard(category, selected)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=markup)
-        except Exception:
-            pass
-    await callback.answer()
+        await callback.message.edit_reply_markup(reply_markup=markup)
 
 @router.callback_query(F.data == "interests_back", StateFilter(ProfileEditState.interests))
 async def edit_interests_back(callback: CallbackQuery, state: FSMContext):
@@ -246,6 +270,7 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
     await state.update_data(interests=", ".join(selected))
     await finish_edit(callback, state, session)
 
+# === Обработчики для игр ===
 @router.callback_query(F.data.startswith("gamecat_"), StateFilter(ProfileEditState.games))
 async def edit_games_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data.split("_", 1)[1]
@@ -276,11 +301,7 @@ async def edit_game_item(callback: CallbackQuery, state: FSMContext):
     category = data.get("current_game_category", "")
     if category:
         markup = games_items_keyboard(category, selected)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=markup)
-        except Exception:
-            pass
-    await callback.answer()
+        await callback.message.edit_reply_markup(reply_markup=markup)
 
 @router.callback_query(F.data == "games_back", StateFilter(ProfileEditState.games))
 async def edit_games_back(callback: CallbackQuery, state: FSMContext):
@@ -390,28 +411,6 @@ async def reset_profile(callback: CallbackQuery, state: FSMContext, session: Asy
 @router.callback_query(F.data == "refresh_recommendations")
 async def refresh_recommendations(callback: CallbackQuery, session: AsyncSession):
     await callback.answer("Рекомендации обновлены!")
-
-@router.callback_query(F.data.startswith("view_user_"))
-async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
-    user_id = int(callback.data.split("_")[2])
-    user = await crud.get_user_by_id(session, user_id)
-    if not user:
-        await callback.answer("Пользователь не найден.")
-        return
-    from utils.helpers import format_user_card
-    from aiogram.types import InputMediaPhoto
-    text = format_user_card(user)
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="gaming_back")]
-    ])
-    if user.photo_file_id:
-        await callback.message.edit_media(
-            InputMediaPhoto(media=user.photo_file_id, caption=text),
-            reply_markup=markup
-        )
-    else:
-        await callback.message.edit_text(text, reply_markup=markup)
-    await callback.answer()
 
 async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, **extra):
     data = await state.get_data()

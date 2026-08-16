@@ -89,6 +89,52 @@ GAMES_CATEGORIES = {
     ]
 }
 
+GENRE_CATEGORIES = {
+    "Рок": [
+        "Alternative Rock", "Hard Rock", "Punk Rock", "Progressive Rock",
+        "Psychedelic Rock", "Grunge", "Indie Rock", "Post-Rock",
+        "Russian Rock", "Classic Rock", "Folk Rock", "Symphonic Rock"
+    ],
+    "Поп": [
+        "Pop", "Russian Pop", "K-Pop", "J-Pop", "Pop Rock",
+        "Synthpop", "Dance Pop", "Electropop", "Teen Pop"
+    ],
+    "Электронная": [
+        "Techno", "House", "Trance", "Drum & Bass", "Dubstep",
+        "Synthwave", "Ambient", "Electro", "IDM", "Breakbeat",
+        "Hardstyle", "Future Bass"
+    ],
+    "Хип-хоп / R&B": [
+        "Hip-Hop", "Russian Rap", "R&B", "Soul", "Trap",
+        "Grime", "G-Funk", "Lo-Fi Hip-Hop", "Alternative Hip-Hop"
+    ],
+    "Джаз / Блюз": [
+        "Jazz", "Blues", "Swing", "Bebop", "Fusion",
+        "Blues Rock", "Soul Blues", "Dixieland", "Acid Jazz"
+    ],
+    "Классика / Инструментальная": [
+        "Classical", "Instrumental", "Orchestral", "Piano", "Acoustic",
+        "Chamber Music", "Baroque", "Romantic", "Minimalism"
+    ],
+    "Метал": [
+        "Metal", "Heavy Metal", "Thrash Metal", "Death Metal",
+        "Black Metal", "Power Metal", "Doom Metal", "Gothic Metal",
+        "Folk Metal", "Nu-Metal", "Metalcore"
+    ],
+    "Фолк / Этно": [
+        "Folk", "Ethno", "Celtic", "Nordic Folk", "Balkan",
+        "African", "Indian Classical", "Andean", "Mongolian Throat Singing"
+    ],
+    "Альтернатива": [
+        "Indie", "Alternative", "Post-Punk", "New Wave", "Shoegaze",
+        "Dream Pop", "Noise Rock", "Math Rock", "Art Rock"
+    ],
+    "Другое": [
+        "Chanson", "Reggae", "Ska", "World", "Soundtrack",
+        "Experimental", "Spoken Word", "Comedy", "Children's Music"
+    ]
+}
+
 def welcome_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Начать регистрацию", callback_data="welcome_start")],
@@ -158,18 +204,22 @@ def preferred_gender_keyboard():
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def genre_choose_keyboard():
-    genres = [
-        "Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical",
-        "Hip-Hop", "Country", "Blues", "Metal", "Other",
-        "Russian Rock", "Alternative Rock", "Punk Rock", "Hard Rock",
-        "Russian Pop", "K-Pop", "J-Pop", "Pop Rock",
-        "Techno", "House", "Drum & Bass", "Dubstep", "Synthwave",
-        "Russian Rap", "R&B", "Soul", "Folk", "Instrumental",
-        "Chanson", "Ethno", "Acoustic", "Ambient", "Trance"
-    ]
-    buttons = [[InlineKeyboardButton(text=g, callback_data=f"genre_add_{g}")] for g in genres]
+def genre_category_keyboard():
+    buttons = []
+    for category in GENRE_CATEGORIES.keys():
+        buttons.append([InlineKeyboardButton(text=category, callback_data=f"genre_cat_{_clean(category)}")])
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="genres_done")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def genre_items_keyboard(category, selected):
+    category = _restore(category).strip()
+    genres = GENRE_CATEGORIES.get(category, [])
+    buttons = []
+    for genre in genres:
+        check = "✅ " if genre in selected else ""
+        clean_genre = _clean(genre)
+        buttons.append([InlineKeyboardButton(text=f"{check}{genre}", callback_data=f"genre_item_{clean_genre}")])
+    buttons.append([InlineKeyboardButton(text="Назад к категориям", callback_data="genre_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def goal_keyboard():
