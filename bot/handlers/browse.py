@@ -14,14 +14,22 @@ from states.like_message import LikeMessageState
 from utils.helpers import format_user_card
 from utils.matching import pick_candidate_simple
 from utils.security import escape_markdown
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, reset_skips: bool = False):
-    user_id = event.from_user.id
+    if isinstance(event, CallbackQuery):
+        user_id = event.from_user.id
+        target_message = event.message
+    else:
+        user_id = event.from_user.id
+        target_message = event
+
     user = await crud.get_user_by_telegram_id(session, user_id)
     if not user:
-        await event.answer("Зарегистрируйтесь через /start")
+        await target_message.answer("Зарегистрируйтесь через /start")
         return
 
     if reset_skips:
@@ -34,7 +42,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
             [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
-        await event.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
+        await target_message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
         return
 
     await state.set_state(Browse.candidate_id)
@@ -46,7 +54,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
 
     if view_count % 7 == 0:
         try:
-            await event.answer(
+            await target_message.answer(
                 "🔍 Вы просмотрели 7 анкет! Если заметили баг или есть идея, напишите @danhooks."
             )
         except:
@@ -56,11 +64,11 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
     markup = browse_actions_keyboard()
     try:
         if candidate.photo_file_id:
-            await event.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
+            await target_message.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
         else:
-            await event.answer(text, reply_markup=markup)
+            await target_message.answer(text, reply_markup=markup)
     except Exception as e:
-        await event.answer(text, reply_markup=markup)
+        await target_message.answer(text, reply_markup=markup)
 
 @router.message(Command("search"))
 async def search_command(message: Message, state: FSMContext, session: AsyncSession):
@@ -111,8 +119,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             await callback.bot.send_message(candidate.telegram_id, text)
             candidate.last_like_notification_count = count
             await session.commit()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to send like count notification: {e}")
 
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username)
@@ -122,24 +130,25 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         try:
             await callback.bot.send_message(
                 candidate.telegram_id,
-                f"Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\n"
+                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\n"
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Mutual like to candidate failed: {e}")
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"Взаимный лайк! Вы и {safe_candidate_name} понравились друг другу.\n"
+                f"💞 Взаимный лайк! Вы и **{safe_candidate_name}** понравились друг другу.\n"
                 f"Напишите ему: {candidate_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
-        await callback.answer("Это взаимно!")
+        except Exception as e:
+            logger.error(f"Mutual like to user failed: {e}")
+        await callback.answer("Это взаимно! 💞")
     else:
         await callback.answer("Лайк поставлен!")
+
     await show_next(callback, state, session)
 
 @router.callback_query(F.data == "skip", Browse.candidate_id)
@@ -193,10 +202,8 @@ async def send_envelope_text(message: Message, state: FSMContext, session: Async
     except Exception as e:
         await message.answer("Не удалось отправить сообщение.")
     if like.is_mutual:
-        # уведомление о взаимности уже есть в create_like
         pass
     await state.clear()
-    # Переключаем на следующую анкету
     await show_next_from_message(message, state, session)
 
 async def show_next_from_message(message: Message, state: FSMContext, session: AsyncSession):
