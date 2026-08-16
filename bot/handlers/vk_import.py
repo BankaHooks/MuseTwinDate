@@ -1,6 +1,5 @@
-import logging
-import re
 from aiogram import Router, F
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +7,8 @@ from database import crud
 from keyboards.reply import main_reply_keyboard
 from utils.vk_api import get_user_audio
 from config import config
+import re
+import logging
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -22,10 +23,9 @@ async def import_vk_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state("vk_import_waiting")
     await callback.answer()
 
-@router.message(F.text, F.state == "vk_import_waiting")
+@router.message(StateFilter("vk_import_waiting"), F.text)
 async def import_vk_process(message: Message, state: FSMContext, session: AsyncSession):
     await message.answer("🔄 Обрабатываю запрос...")
-
     text = message.text.strip()
     user_id = None
     match = re.search(r'vk\.com/(id|club|public)(\d+)', text)
@@ -84,16 +84,14 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
         await state.clear()
         return
 
-    # Сохраняем в vk_audio, а не в favorite_songs
-    await crud.update_user(session, user, vk_audio=songs_str)
-    # Также добавляем группы из VK в favorite_bands? По условию не добавляем, пользователь сам вводит группы.
-    # Но можно добавить как рекомендацию, но не сохранять автоматически. По твоему требованию мы не трогаем любимые группы.
+    await crud.update_user(session, user, vk_songs=songs_str, vk_bands=bands_str)
 
     await message.answer(
-        f"✅ Импортировано {len(songs)} песен из VK!\n\n"
-        f"🎵 Мы проанализировали: {songs_str}\n\n"
+        f"✅ Импортировано {len(songs)} песен!\n\n"
+        f"🎵 Песни из VK: {songs_str}\n"
+        f"🎤 Группы из VK: {bands_str}\n\n"
         "Теперь бот будет учитывать их при поиске.\n"
-        "Вы можете добавить любимые группы и песни вручную в профиле.",
+        "Вы всегда можете добавить любимые песни вручную в профиле.",
         reply_markup=main_reply_keyboard()
     )
     await state.clear()

@@ -19,7 +19,8 @@ async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Opti
     user_genres = set(_split_keywords(user.favorite_genres))
     user_bands = set(_split_keywords(user.favorite_bands))
     user_songs = set(_split_keywords(user.favorite_songs))
-    user_vk_audio = set(_split_keywords(user.vk_audio))
+    user_vk_bands = set(_split_keywords(user.vk_bands))
+    user_vk_songs = set(_split_keywords(user.vk_songs))
     user_interests = set(_split_keywords(user.interests))
     user_goal = user.search_goal
 
@@ -31,7 +32,7 @@ async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Opti
         if user_genres and cand_genres:
             common = user_genres & cand_genres
             if common:
-                score += len(common) * 0.15
+                score += len(common) * 0.12
 
         cand_bands = set(_split_keywords(candidate.favorite_bands))
         if user_bands and cand_bands:
@@ -45,18 +46,23 @@ async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Opti
             if common:
                 score += len(common) * 0.25
 
-        # Учитываем VK аудио
-        cand_vk_audio = set(_split_keywords(candidate.vk_audio))
-        if user_vk_audio and cand_vk_audio:
-            common = user_vk_audio & cand_vk_audio
+        cand_vk_bands = set(_split_keywords(candidate.vk_bands))
+        if user_vk_bands and cand_vk_bands:
+            common = user_vk_bands & cand_vk_bands
             if common:
-                score += len(common) * 0.25
+                score += len(common) * 0.15
+
+        cand_vk_songs = set(_split_keywords(candidate.vk_songs))
+        if user_vk_songs and cand_vk_songs:
+            common = user_vk_songs & cand_vk_songs
+            if common:
+                score += len(common) * 0.20
 
         cand_interests = set(_split_keywords(candidate.interests))
         if user_interests and cand_interests:
             common = user_interests & cand_interests
             if common:
-                score += len(common) * 0.05
+                score += len(common) * 0.08
 
         if user_goal and candidate.search_goal and user_goal == candidate.search_goal:
             score += 0.10
