@@ -7,7 +7,7 @@ from utils.helpers import parse_comma_separated, normalize_goal
 
 logger = logging.getLogger(__name__)
 
-# Родственные группы жанров (поджанры)
+# Родственные группы жанров
 GENRE_GROUPS = {
     "Rock": ["Alternative Rock", "Hard Rock", "Punk Rock", "Progressive Rock",
              "Psychedelic Rock", "Grunge", "Indie Rock", "Post-Rock",
@@ -47,6 +47,7 @@ def get_genre_group(genre: str) -> str:
     return GENRE_TO_GROUP.get(genre, genre)
 
 def calculate_match_score(user1: User, user2: User) -> int:
+    # Парсим поля в множества (нижний регистр уже внутри parse_comma_separated)
     songs1 = parse_comma_separated(user1.favorite_songs)
     songs2 = parse_comma_separated(user2.favorite_songs)
     bands1 = parse_comma_separated(user1.favorite_bands)
@@ -58,49 +59,40 @@ def calculate_match_score(user1: User, user2: User) -> int:
     interests1 = parse_comma_separated(user1.interests)
     interests2 = parse_comma_separated(user2.interests)
 
+    score = 30  # Базовый минимум
+
+    # 1. Песни: +20% за каждую общую
     common_songs = songs1 & songs2
+    score += len(common_songs) * 20
+
+    # 2. Группы (исполнители): +15% за каждую общую
     common_bands = bands1 & bands2
+    score += len(common_bands) * 15
+
+    # 3. Жанры: точные совпадения +20% за каждый
     common_genres = genres1 & genres2
+    score += len(common_genres) * 20
+
+    # 4. Родственные группы жанров: +15% за каждую общую группу
+    groups1 = {get_genre_group(g) for g in genres1}
+    groups2 = {get_genre_group(g) for g in genres2}
+    common_groups = groups1 & groups2
+    score += len(common_groups) * 15
+
+    # 5. Игры: +10% за каждую общую
     common_games = games1 & games2
+    score += len(common_games) * 10
+
+    # 6. Интересы: +5% за каждый общий
     common_interests = interests1 & interests2
+    score += len(common_interests) * 5
 
-    # Родственные жанры (поджанры) – исключаем точные и считаем общие группы
-    remaining_genres1 = genres1 - common_genres
-    remaining_genres2 = genres2 - common_genres
-    groups1 = {}
-    for g in remaining_genres1:
-        group = get_genre_group(g)
-        groups1.setdefault(group, set()).add(g)
-    groups2 = {}
-    for g in remaining_genres2:
-        group = get_genre_group(g)
-        groups2.setdefault(group, set()).add(g)
-    common_groups = set(groups1.keys()) & set(groups2.keys())
-    related_count = 0
-    for group in common_groups:
-        count1 = len(groups1.get(group, set()))
-        count2 = len(groups2.get(group, set()))
-        related_count += min(count1, count2)
-
-    # Базовый минимум 30%
-    score = 30
-
-    # Бонусы с ограничениями
-    bonus_songs = min(len(common_songs) * 10, 30)
-    bonus_bands = min(len(common_bands) * 8, 24)
-    bonus_genres_exact = min(len(common_genres) * 6, 18)
-    bonus_genres_related = min(related_count * 3, 9)
-    bonus_games = min(len(common_games) * 5, 15)
-    bonus_interests = min(len(common_interests) * 2, 10)
-
+    # 7. Цель: +5%, если совпадает
     goal1 = normalize_goal(user1.search_goal)
     goal2 = normalize_goal(user2.search_goal)
-    bonus_goal = 5 if (goal1 and goal2 and goal1 == goal2) else 0
+    if goal1 and goal2 and goal1 == goal2:
+        score += 5
 
-    total_bonus = (bonus_songs + bonus_bands + bonus_genres_exact +
-                   bonus_genres_related + bonus_games + bonus_interests + bonus_goal)
-
-    score += total_bonus
     return min(score, 100)
 
 async def get_candidates_sorted(session: AsyncSession, user: User, limit: int = 5) -> List[Tuple[User, int]]:
