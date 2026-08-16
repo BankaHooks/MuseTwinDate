@@ -173,6 +173,14 @@ async def get_likes_count(session: AsyncSession, user_id: int) -> int:
     result = await session.execute(select(func.count(Like.id)).where(Like.to_user_id == user_id))
     return result.scalar() or 0
 
+async def get_likes_given_count(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(select(func.count(Like.id)).where(Like.from_user_id == user_id))
+    return result.scalar() or 0
+
+async def get_mutual_likes_count(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(select(func.count(Like.id)).where(and_(Like.from_user_id == user_id, Like.is_mutual == True)))
+    return result.scalar() or 0
+
 async def update_like_notification_count(session: AsyncSession, user: User, count: int):
     user.last_like_notification_count = count
     await session.commit()

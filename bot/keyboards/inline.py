@@ -81,9 +81,15 @@ def main_menu_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def profile_view_keyboard(user):
-    city_toggle_text = "Искать в моём городе" if user.search_city_only else "Искать везде"
-    hide_text = "Скрыть анкету" if not user.is_hidden else "Показать анкету"
+def profile_main_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="Редактировать профиль", callback_data="profile_edit_menu")],
+        [InlineKeyboardButton(text="Параметры поиска", callback_data="profile_search_settings")],
+        [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def profile_edit_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Имя", callback_data="edit_name"),
          InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
@@ -95,11 +101,19 @@ def profile_view_keyboard(user):
         [InlineKeyboardButton(text="Интересы", callback_data="edit_interests"),
          InlineKeyboardButton(text="Био", callback_data="edit_bio")],
         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+        [InlineKeyboardButton(text="Перезаполнить анкету заново", callback_data="reset_profile")],
+        [InlineKeyboardButton(text="Назад", callback_data="profile_back")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def profile_search_settings_keyboard(user):
+    city_toggle_text = "Искать в моём городе" if user.search_city_only else "Искать везде"
+    hide_text = "Скрыть анкету" if not user.is_hidden else "Показать анкету"
+    buttons = [
         [InlineKeyboardButton(text="Пол партнера", callback_data="edit_preferred_gender")],
         [InlineKeyboardButton(text=city_toggle_text, callback_data="toggle_city")],
         [InlineKeyboardButton(text=hide_text, callback_data="toggle_hide")],
-        [InlineKeyboardButton(text="Заполнить заново", callback_data="reset_profile")],
-        [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="profile_back")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

@@ -111,7 +111,7 @@ def format_user_card(user, match_score=None):
         text += f"Совпадение вкуса: {round(match_score * 100)}%\n"
     return text
 
-def format_profile(user):
+def format_profile(user) -> str:
     name_line = user.name or "Без имени"
     if user.is_premium:
         name_line += " ⭐"

@@ -7,8 +7,9 @@ from database import crud
 from states.registration import Registration
 from states.profile_edit import ProfileEdit
 from keyboards.inline import (
-    profile_view_keyboard, genre_choose_keyboard, gender_choose_keyboard,
-    preferred_gender_keyboard, goal_keyboard, interest_category_keyboard, interest_items_keyboard
+    profile_main_keyboard, profile_edit_keyboard, profile_search_settings_keyboard,
+    genre_choose_keyboard, gender_choose_keyboard, preferred_gender_keyboard,
+    goal_keyboard, interest_category_keyboard, interest_items_keyboard, main_menu_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, format_profile, normalize_city
@@ -18,24 +19,45 @@ router = Router()
 
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
-    await show_profile(callback.message, callback.from_user.id, session, delete_old=True)
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+
+    received = await crud.get_likes_count(session, user.id)
+    given = await crud.get_likes_given_count(session, user.id)
+    mutual = await crud.get_mutual_likes_count(session, user.id)
+
+    text = format_profile(user)
+    text += f"\n📊 Статистика лайков:\n"
+    text += f"Получено: {received}\n"
+    text += f"Отправлено: {given}\n"
+    text += f"Взаимных: {mutual}"
+
+    await callback.message.delete()
+    if user.photo_file_id:
+        await callback.message.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_main_keyboard())
+    else:
+        await callback.message.answer(text, reply_markup=profile_main_keyboard())
     await callback.answer()
 
-async def show_profile(target: Message, user_id: int, session: AsyncSession, delete_old: bool = False):
-    user = await crud.get_user_by_telegram_id(session, user_id)
-    if not user:
-        await target.answer("Зарегистрируйтесь через /start")
-        return
-    text = format_profile(user)
-    if delete_old:
-        await target.delete()
-    if user.photo_file_id:
-        await target.answer_photo(photo=user.photo_file_id, caption=text, reply_markup=profile_view_keyboard(user))
-    else:
-        await target.answer(text, reply_markup=profile_view_keyboard(user))
+@router.callback_query(F.data == "profile_back")
+async def profile_back(callback: CallbackQuery, session: AsyncSession):
+    await profile_view(callback, session)
 
-async def show_profile_for_message(message: Message, session: AsyncSession):
-    await show_profile(message, message.from_user.id, session, delete_old=False)
+@router.callback_query(F.data == "profile_edit_menu")
+async def profile_edit_menu(callback: CallbackQuery):
+    await callback.message.edit_text("Выберите поле для редактирования:", reply_markup=profile_edit_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "profile_search_settings")
+async def profile_search_settings(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+    await callback.message.edit_text("Настройки поиска:", reply_markup=profile_search_settings_keyboard(user))
+    await callback.answer()
 
 @router.callback_query(F.data == "reset_profile")
 async def reset_profile(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -64,9 +86,7 @@ async def toggle_city(callback: CallbackQuery, session: AsyncSession):
         return
     user.search_city_only = not user.search_city_only
     await session.commit()
-    await callback.message.delete()
-    await show_profile(callback.message, callback.from_user.id, session, delete_old=False)
-    await callback.answer("Настройка обновлена")
+    await profile_search_settings(callback, session)
 
 @router.callback_query(F.data == "toggle_hide")
 async def toggle_hide(callback: CallbackQuery, session: AsyncSession):
@@ -76,9 +96,7 @@ async def toggle_hide(callback: CallbackQuery, session: AsyncSession):
         return
     user.is_hidden = not user.is_hidden
     await session.commit()
-    await callback.message.delete()
-    await show_profile(callback.message, callback.from_user.id, session, delete_old=False)
-    await callback.answer("Анкета обновлена")
+    await profile_search_settings(callback, session)
 
 @router.callback_query(F.data.startswith("edit_"))
 async def edit_field(callback: CallbackQuery, state: FSMContext):
