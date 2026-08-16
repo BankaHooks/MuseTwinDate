@@ -1,3 +1,4 @@
+from typing import Union
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -324,7 +325,10 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     field = data.get("edit_field")
     user = await crud.get_user_by_telegram_id(session, event.from_user.id)
     if not user:
-        await event.answer("Ошибка")
+        if isinstance(event, CallbackQuery):
+            await event.answer("Ошибка")
+        else:
+            await event.reply("Ошибка")
         return
     update_data = {}
     for key in ["name", "age", "city", "genres", "bands", "songs", "goal", "interests", "bio", "photo_file_id"]:
@@ -338,7 +342,7 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     await session.commit()
     await state.clear()
     if isinstance(event, Message):
-        await event.answer("Профиль обновлён!")
+        await event.reply("Профиль обновлён!")
         await show_profile_for_message(event, session)
     else:
         await event.answer("Профиль обновлён!")
