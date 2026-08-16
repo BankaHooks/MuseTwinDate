@@ -14,6 +14,7 @@ router = Router()
 class LikesState(StatesGroup):
     current_index = State()
     likes_list = State()
+    viewer_id = State()
 
 @router.callback_query(F.data == "likes")
 async def likes_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -45,9 +46,7 @@ async def show_like_card(target: Message, state: FSMContext, session: AsyncSessi
     if idx >= len(like_ids):
         if edit:
             await target.delete()
-            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
-        else:
-            await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
+        await target.answer("Вы просмотрели все лайки.", reply_markup=main_reply_keyboard())
         await state.clear()
         return
     user_id = like_ids[idx]
@@ -60,7 +59,7 @@ async def show_like_card(target: Message, state: FSMContext, session: AsyncSessi
     mutual = like_between is not None and like_between.is_mutual
     text = format_user_card(liker)
     if mutual:
-        text += "\nВзаимный лайк!"
+        text += "\n✅ Взаимный лайк!"
     markup = likes_action_keyboard(liker.id)
     if edit:
         if liker.photo_file_id:
@@ -84,14 +83,14 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
     if not target:
         await callback.answer("Пользователь не найден.")
         return
-    # Проверка, не лайкал ли уже
+    # Проверяем, есть ли уже лайк
     existing = await crud.create_like(session, user.id, target.id)
     if existing and existing.is_mutual:
         await callback.answer("Уже взаимно!")
         return
     like = existing if existing else await crud.create_like(session, user.id, target.id)
-    # уведомление о количестве лайков
-    total_likes = await crud.get_likes_count(session, target.id)
+    # Уведомление о количестве лайков
+    total_likes = await get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
         display_count = "9+" if count > 9 else str(count)
@@ -131,12 +130,12 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Вы лайкнули в ответ!")
-    # Переход к следующей анкете в лайках
+    # Переход к следующей анкете
     data = await state.get_data()
     idx = data.get("current_index", 0)
     await state.update_data(current_index=idx + 1)
     await show_like_card(callback.message, state, session, edit=True)
-    
+
 @router.callback_query(F.data.startswith("skip_like_"))
 async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
