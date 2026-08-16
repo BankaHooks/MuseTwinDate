@@ -7,6 +7,45 @@ from utils.helpers import parse_comma_separated, normalize_goal
 
 logger = logging.getLogger(__name__)
 
+# Родственные группы жанров (поджанры)
+GENRE_GROUPS = {
+    "Rock": ["Alternative Rock", "Hard Rock", "Punk Rock", "Progressive Rock",
+             "Psychedelic Rock", "Grunge", "Indie Rock", "Post-Rock",
+             "Russian Rock", "Classic Rock", "Folk Rock", "Symphonic Rock"],
+    "Pop": ["Russian Pop", "K-Pop", "J-Pop", "Pop Rock", "Synthpop",
+            "Dance Pop", "Electropop", "Teen Pop"],
+    "Electronic": ["Techno", "House", "Trance", "Drum & Bass", "Dubstep",
+                   "Synthwave", "Ambient", "Electro", "IDM", "Breakbeat",
+                   "Hardstyle", "Future Bass"],
+    "Hip-Hop/R&B": ["Hip-Hop", "Russian Rap", "R&B", "Soul", "Trap",
+                    "Grime", "G-Funk", "Lo-Fi Hip-Hop", "Alternative Hip-Hop"],
+    "Jazz/Blues": ["Jazz", "Blues", "Swing", "Bebop", "Fusion",
+                   "Blues Rock", "Soul Blues", "Dixieland", "Acid Jazz"],
+    "Classical/Instrumental": ["Classical", "Instrumental", "Orchestral", "Piano",
+                               "Acoustic", "Chamber Music", "Baroque", "Romantic",
+                               "Minimalism"],
+    "Metal": ["Metal", "Heavy Metal", "Thrash Metal", "Death Metal",
+              "Black Metal", "Power Metal", "Doom Metal", "Gothic Metal",
+              "Folk Metal", "Nu-Metal", "Metalcore"],
+    "Folk/Ethno": ["Folk", "Ethno", "Celtic", "Nordic Folk", "Balkan",
+                   "African", "Indian Classical", "Andean", "Mongolian Throat Singing"],
+    "Alternative": ["Indie", "Alternative", "Post-Punk", "New Wave", "Shoegaze",
+                    "Dream Pop", "Noise Rock", "Math Rock", "Art Rock"],
+    "Other": ["Chanson", "Reggae", "Ska", "World", "Soundtrack",
+              "Experimental", "Spoken Word", "Comedy", "Children's Music"]
+}
+
+# Обратный словарь: поджанр -> основная группа
+GENRE_TO_GROUP = {}
+for group, subgenres in GENRE_GROUPS.items():
+    for sub in subgenres:
+        GENRE_TO_GROUP[sub] = group
+for group in GENRE_GROUPS:
+    GENRE_TO_GROUP[group] = group
+
+def get_genre_group(genre: str) -> str:
+    return GENRE_TO_GROUP.get(genre, genre)
+
 def calculate_match_score(user1: User, user2: User) -> int:
     songs1 = parse_comma_separated(user1.favorite_songs)
     songs2 = parse_comma_separated(user2.favorite_songs)
@@ -19,47 +58,49 @@ def calculate_match_score(user1: User, user2: User) -> int:
     interests1 = parse_comma_separated(user1.interests)
     interests2 = parse_comma_separated(user2.interests)
 
-    score = 0
-
     common_songs = songs1 & songs2
-    if common_songs:
-        score += 40
-        score += min(len(common_songs) * 5, 15)
-    else:
-        pass
-
     common_bands = bands1 & bands2
-    if common_bands:
-        score += 30
-        score += min(len(common_bands) * 3, 9)
-
     common_genres = genres1 & genres2
-    if common_genres:
-        score += 35
-        score += min(len(common_genres) * 4, 12)
-
     common_games = games1 & games2
-    if common_games:
-        score += 15
-        score += min(len(common_games) * 2, 6)
-
     common_interests = interests1 & interests2
-    if common_interests:
-        score += 10
-        score += min(len(common_interests) * 1, 3)
+
+    # Родственные жанры (поджанры) – исключаем точные и считаем общие группы
+    remaining_genres1 = genres1 - common_genres
+    remaining_genres2 = genres2 - common_genres
+    groups1 = {}
+    for g in remaining_genres1:
+        group = get_genre_group(g)
+        groups1.setdefault(group, set()).add(g)
+    groups2 = {}
+    for g in remaining_genres2:
+        group = get_genre_group(g)
+        groups2.setdefault(group, set()).add(g)
+    common_groups = set(groups1.keys()) & set(groups2.keys())
+    related_count = 0
+    for group in common_groups:
+        count1 = len(groups1.get(group, set()))
+        count2 = len(groups2.get(group, set()))
+        related_count += min(count1, count2)
+
+    # Базовый минимум 30%
+    score = 30
+
+    # Бонусы с ограничениями
+    bonus_songs = min(len(common_songs) * 10, 30)
+    bonus_bands = min(len(common_bands) * 8, 24)
+    bonus_genres_exact = min(len(common_genres) * 6, 18)
+    bonus_genres_related = min(related_count * 3, 9)
+    bonus_games = min(len(common_games) * 5, 15)
+    bonus_interests = min(len(common_interests) * 2, 10)
 
     goal1 = normalize_goal(user1.search_goal)
     goal2 = normalize_goal(user2.search_goal)
-    if goal1 and goal2 and goal1 == goal2:
-        score += 5
+    bonus_goal = 5 if (goal1 and goal2 and goal1 == goal2) else 0
 
-    # Поднимаем минимум до 30, если есть хоть одно совпадение в музыке (песни/группы/жанры)
-    has_music_match = bool(common_songs or common_bands or common_genres)
-    if has_music_match and score < 40:
-        score = 40
-    elif not has_music_match and score < 30:
-        score = 30
+    total_bonus = (bonus_songs + bonus_bands + bonus_genres_exact +
+                   bonus_genres_related + bonus_games + bonus_interests + bonus_goal)
 
+    score += total_bonus
     return min(score, 100)
 
 async def get_candidates_sorted(session: AsyncSession, user: User, limit: int = 5) -> List[Tuple[User, int]]:
