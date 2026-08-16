@@ -30,25 +30,25 @@ async def pick_candidate_simple(session: AsyncSession, user: User) -> Tuple[Opti
         if user_genres and cand_genres:
             common = user_genres & cand_genres
             if common:
-                score += len(common) * 0.20
+                score += len(common) * 0.35
 
         cand_bands = set(_split_keywords(candidate.favorite_bands))
         if user_bands and cand_bands:
             common = user_bands & cand_bands
             if common:
-                score += len(common) * 0.40
+                score += len(common) * 0.50
 
         cand_songs = set(_split_keywords(candidate.favorite_songs))
         if user_songs and cand_songs:
             common = user_songs & cand_songs
             if common:
-                score += len(common) * 0.50
+                score += len(common) * 0.67
 
         cand_interests = set(_split_keywords(candidate.interests))
         if user_interests and cand_interests:
             common = user_interests & cand_interests
             if common:
-                score += len(common) * 0.08
+                score += len(common) * 0.1
 
         if user_goal and candidate.search_goal and user_goal == candidate.search_goal:
             score += 0.10
