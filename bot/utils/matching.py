@@ -7,35 +7,33 @@ from utils.helpers import parse_comma_separated, normalize_goal
 
 logger = logging.getLogger(__name__)
 
-# Родственные группы жанров
 GENRE_GROUPS = {
-    "Rock": ["Alternative Rock", "Hard Rock", "Punk Rock", "Progressive Rock",
-             "Psychedelic Rock", "Grunge", "Indie Rock", "Post-Rock",
-             "Russian Rock", "Classic Rock", "Folk Rock", "Symphonic Rock"],
-    "Pop": ["Russian Pop", "K-Pop", "J-Pop", "Pop Rock", "Synthpop",
-            "Dance Pop", "Electropop", "Teen Pop"],
-    "Electronic": ["Techno", "House", "Trance", "Drum & Bass", "Dubstep",
-                   "Synthwave", "Ambient", "Electro", "IDM", "Breakbeat",
-                   "Hardstyle", "Future Bass"],
-    "Hip-Hop/R&B": ["Hip-Hop", "Russian Rap", "R&B", "Soul", "Trap",
-                    "Grime", "G-Funk", "Lo-Fi Hip-Hop", "Alternative Hip-Hop"],
-    "Jazz/Blues": ["Jazz", "Blues", "Swing", "Bebop", "Fusion",
-                   "Blues Rock", "Soul Blues", "Dixieland", "Acid Jazz"],
-    "Classical/Instrumental": ["Classical", "Instrumental", "Orchestral", "Piano",
-                               "Acoustic", "Chamber Music", "Baroque", "Romantic",
-                               "Minimalism"],
-    "Metal": ["Metal", "Heavy Metal", "Thrash Metal", "Death Metal",
-              "Black Metal", "Power Metal", "Doom Metal", "Gothic Metal",
-              "Folk Metal", "Nu-Metal", "Metalcore"],
-    "Folk/Ethno": ["Folk", "Ethno", "Celtic", "Nordic Folk", "Balkan",
-                   "African", "Indian Classical", "Andean", "Mongolian Throat Singing"],
-    "Alternative": ["Indie", "Alternative", "Post-Punk", "New Wave", "Shoegaze",
-                    "Dream Pop", "Noise Rock", "Math Rock", "Art Rock"],
-    "Other": ["Chanson", "Reggae", "Ska", "World", "Soundtrack",
-              "Experimental", "Spoken Word", "Comedy", "Children's Music"]
+    "rock": ["alternative rock", "hard rock", "punk rock", "progressive rock",
+             "psychedelic rock", "grunge", "indie rock", "post-rock",
+             "russian rock", "classic rock", "folk rock", "symphonic rock"],
+    "pop": ["russian pop", "k-pop", "j-pop", "pop rock", "synthpop",
+            "dance pop", "electropop", "teen pop"],
+    "electronic": ["techno", "house", "trance", "drum & bass", "dubstep",
+                   "synthwave", "ambient", "electro", "idm", "breakbeat",
+                   "hardstyle", "future bass"],
+    "hip-hop/r&b": ["hip-hop", "russian rap", "r&b", "soul", "trap",
+                    "grime", "g-funk", "lo-fi hip-hop", "alternative hip-hop"],
+    "jazz/blues": ["jazz", "blues", "swing", "bebop", "fusion",
+                   "blues rock", "soul blues", "dixieland", "acid jazz"],
+    "classical/instrumental": ["classical", "instrumental", "orchestral", "piano",
+                               "acoustic", "chamber music", "baroque", "romantic",
+                               "minimalism"],
+    "metal": ["metal", "heavy metal", "thrash metal", "death metal",
+              "black metal", "power metal", "doom metal", "gothic metal",
+              "folk metal", "nu-metal", "metalcore"],
+    "folk/ethno": ["folk", "ethno", "celtic", "nordic folk", "balkan",
+                   "african", "indian classical", "andean", "mongolian throat singing"],
+    "alternative": ["indie", "alternative", "post-punk", "new wave", "shoegaze",
+                    "dream pop", "noise rock", "math rock", "art rock"],
+    "other": ["chanson", "reggae", "ska", "world", "soundtrack",
+              "experimental", "spoken word", "comedy", "children's music"]
 }
 
-# Обратный словарь: поджанр -> основная группа
 GENRE_TO_GROUP = {}
 for group, subgenres in GENRE_GROUPS.items():
     for sub in subgenres:
@@ -44,10 +42,10 @@ for group in GENRE_GROUPS:
     GENRE_TO_GROUP[group] = group
 
 def get_genre_group(genre: str) -> str:
-    return GENRE_TO_GROUP.get(genre, genre)
+    genre_lower = genre.lower().strip()
+    return GENRE_TO_GROUP.get(genre_lower, genre_lower)
 
 def calculate_match_score(user1: User, user2: User) -> int:
-    # Парсим поля в множества (нижний регистр уже внутри parse_comma_separated)
     songs1 = parse_comma_separated(user1.favorite_songs)
     songs2 = parse_comma_separated(user2.favorite_songs)
     bands1 = parse_comma_separated(user1.favorite_bands)
@@ -59,35 +57,31 @@ def calculate_match_score(user1: User, user2: User) -> int:
     interests1 = parse_comma_separated(user1.interests)
     interests2 = parse_comma_separated(user2.interests)
 
-    score = 30  # Базовый минимум
+    score = 30
 
-    # 1. Песни: +20% за каждую общую
     common_songs = songs1 & songs2
     score += len(common_songs) * 20
 
-    # 2. Группы (исполнители): +15% за каждую общую
     common_bands = bands1 & bands2
     score += len(common_bands) * 15
 
-    # 3. Жанры: точные совпадения +20% за каждый
     common_genres = genres1 & genres2
     score += len(common_genres) * 20
 
-    # 4. Родственные группы жанров: +15% за каждую общую группу
-    groups1 = {get_genre_group(g) for g in genres1}
-    groups2 = {get_genre_group(g) for g in genres2}
+    # 4. Родственные группы жанров (только для жанров, которые не совпали точно)
+    remaining_genres1 = genres1 - common_genres
+    remaining_genres2 = genres2 - common_genres
+    groups1 = {get_genre_group(g) for g in remaining_genres1}
+    groups2 = {get_genre_group(g) for g in remaining_genres2}
     common_groups = groups1 & groups2
     score += len(common_groups) * 15
 
-    # 5. Игры: +10% за каждую общую
     common_games = games1 & games2
     score += len(common_games) * 10
 
-    # 6. Интересы: +5% за каждый общий
     common_interests = interests1 & interests2
     score += len(common_interests) * 5
 
-    # 7. Цель: +5%, если совпадает
     goal1 = normalize_goal(user1.search_goal)
     goal2 = normalize_goal(user2.search_goal)
     if goal1 and goal2 and goal1 == goal2:
