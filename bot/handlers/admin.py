@@ -43,13 +43,17 @@ async def admin_reports(callback: CallbackQuery, session: AsyncSession):
     page = int(callback.data.split("_")[2]) if len(callback.data.split("_")) > 2 else 0
     limit = 5
     offset = page * limit
-    reports = await crud.get_reports(session, resolved=False, offset=offset, limit=limit + 1)
-    if not reports:
+
+    all_reports = await crud.get_reports(session, resolved=False)
+    if not all_reports:
         await callback.message.edit_text("Нет непросмотренных репортов.", reply_markup=admin_keyboard())
         await callback.answer()
         return
+
+    reports = all_reports[offset:offset + limit + 1]
     has_more = len(reports) > limit
     reports = reports[:limit]
+
     text = "📋 Непросмотренные репорты:\n\n"
     buttons = []
     for r in reports:
