@@ -8,6 +8,8 @@ class Registration(StatesGroup):
     genres = State()
     bands = State()
     songs = State()
+    albums = State()
+    artists = State()
     goal = State()
     interests = State()
     preferred_gender = State()

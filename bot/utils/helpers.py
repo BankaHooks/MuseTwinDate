@@ -97,6 +97,10 @@ def format_user_card(user, match_score=None):
         text += f"Группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Песни: {user.favorite_songs}\n"
+    if user.favorite_albums:
+        text += f"Альбомы: {user.favorite_albums}\n"
+    if user.favorite_artists:
+        text += f"Исполнители: {user.favorite_artists}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
@@ -111,7 +115,7 @@ def format_user_card(user, match_score=None):
         text += f"Совпадение вкуса: {round(match_score * 100)}%\n"
     return text
 
-def format_profile(user) -> str:
+def format_profile(user):
     name_line = user.name or "Без имени"
     if user.is_premium:
         name_line += " ⭐"
@@ -128,6 +132,10 @@ def format_profile(user) -> str:
         text += f"Любимые группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Любимые песни: {user.favorite_songs}\n"
+    if user.favorite_albums:
+        text += f"Любимые альбомы: {user.favorite_albums}\n"
+    if user.favorite_artists:
+        text += f"Любимые исполнители: {user.favorite_artists}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)

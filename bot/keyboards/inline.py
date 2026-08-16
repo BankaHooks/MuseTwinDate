@@ -90,6 +90,8 @@ def profile_edit_keyboard():
         [InlineKeyboardButton(text="Жанры", callback_data="edit_genres"),
          InlineKeyboardButton(text="Группы", callback_data="edit_bands")],
         [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
+         InlineKeyboardButton(text="Альбомы", callback_data="edit_albums")],
+        [InlineKeyboardButton(text="Исполнители", callback_data="edit_artists"),
          InlineKeyboardButton(text="Цель", callback_data="edit_goal")],
         [InlineKeyboardButton(text="Интересы", callback_data="edit_interests"),
          InlineKeyboardButton(text="Био", callback_data="edit_bio")],

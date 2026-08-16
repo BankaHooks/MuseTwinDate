@@ -126,6 +126,20 @@ async def reg_bands(message: Message, state: FSMContext):
 async def reg_songs(message: Message, state: FSMContext):
     songs = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
     await state.update_data(songs=songs)
+    await state.set_state(Registration.albums)
+    await message.answer("Введите ваши любимые альбомы (можно несколько, через запятую):\n(или 'Пропустить')")
+
+@router.message(Registration.albums)
+async def reg_albums(message: Message, state: FSMContext):
+    albums = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
+    await state.update_data(albums=albums)
+    await state.set_state(Registration.artists)
+    await message.answer("Ваши любимые исполнители (можно несколько, через запятую):\n(или 'Пропустить')")
+
+@router.message(Registration.artists)
+async def reg_artists(message: Message, state: FSMContext):
+    artists = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
+    await state.update_data(artists=artists)
     await state.set_state(Registration.goal)
     await message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
 
@@ -225,6 +239,8 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
                 favorite_genres=data.get("genres"),
                 favorite_bands=data.get("bands"),
                 favorite_songs=data.get("songs"),
+                favorite_albums=data.get("albums"),
+                favorite_artists=data.get("artists"),
                 search_goal=data.get("goal"),
                 interests=data.get("interests"),
                 preferred_gender=data.get("preferred_gender"),
@@ -244,6 +260,8 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
             favorite_genres=data.get("genres"),
             favorite_bands=data.get("bands"),
             favorite_songs=data.get("songs"),
+            favorite_albums=data.get("albums"),
+            favorite_artists=data.get("artists"),
             search_goal=data.get("goal"),
             interests=data.get("interests"),
             preferred_gender=data.get("preferred_gender"),

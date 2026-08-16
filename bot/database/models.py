@@ -15,6 +15,8 @@ class User(Base):
     favorite_genres = Column(Text, nullable=True)
     favorite_bands = Column(Text, nullable=True)
     favorite_songs = Column(Text, nullable=True)
+    favorite_albums = Column(Text, nullable=True)
+    favorite_artists = Column(Text, nullable=True)
     search_goal = Column(String(50), nullable=True)
     interests = Column(Text, nullable=True)
     preferred_gender = Column(String(50), nullable=True)
@@ -34,6 +36,8 @@ class User(Base):
     last_activity = Column(DateTime, default=datetime.utcnow)
     last_like_notification_count = Column(Integer, default=0)
     last_inactivity_notification = Column(DateTime, nullable=True)
+    last_reset = Column(DateTime, nullable=True)
+    embedding = Column(Text, nullable=True)
 
     sent_likes = relationship("Like", foreign_keys="Like.from_user_id", back_populates="from_user")
     received_likes = relationship("Like", foreign_keys="Like.to_user_id", back_populates="to_user")
@@ -41,9 +45,6 @@ class User(Base):
     blocks_given = relationship("Block", foreign_keys="Block.blocker_id", back_populates="blocker")
     blocks_received = relationship("Block", foreign_keys="Block.blocked_id", back_populates="blocked")
     reports_sent = relationship("Report", foreign_keys="Report.reporter_id", back_populates="reporter")
-
-    last_reset = Column(DateTime, nullable=True)
-    embedding = Column(Text, nullable=True)  
 
 class Like(Base):
     __tablename__ = "likes"

@@ -125,8 +125,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
+        except Exception as e:
+            print(f"Ошибка отправки уведомления о взаимном лайке: {e}")
         try:
             await callback.bot.send_message(
                 user.telegram_id,
@@ -134,8 +134,8 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
                 f"Напишите ему: {candidate_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
+        except Exception as e:
+            print(f"Ошибка отправки уведомления о взаимном лайке: {e}")
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Лайк поставлен!")
