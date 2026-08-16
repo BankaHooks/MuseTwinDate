@@ -1,9 +1,9 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from config import config
+from keyboards.reply import main_reply_keyboard
 import re
 
 router = Router()
@@ -21,9 +21,7 @@ async def import_vk_start(callback: CallbackQuery, state: FSMContext):
 @router.message(F.text, F.state == "vk_import_waiting")
 async def import_vk_process(message: Message, state: FSMContext, session: AsyncSession):
     text = message.text.strip()
-    # Пытаемся извлечь ID пользователя
     user_id = None
-    # Если ссылка вида https://vk.com/id12345
     match = re.search(r'vk\.com/(id|club|public)(\d+)', text)
     if match:
         user_id = match.group(2)
@@ -35,10 +33,6 @@ async def import_vk_process(message: Message, state: FSMContext, session: AsyncS
         await state.clear()
         return
 
-    # Здесь можно было бы сделать запрос к VK API для получения групп пользователя,
-    # но для этого нужен access_token пользователя (не сервисный).
-    # Так как у нас нет OAuth, мы не можем получить список групп пользователя.
-    # Поэтому предлагаем пользователю ввести группы вручную.
     await message.answer(
         "К сожалению, автоматический импорт из VK требует авторизации (OAuth), которую мы пока не настроили.\n\n"
         "Вы можете добавить любимые группы вручную через редактирование профиля (кнопка «Группы»).\n"
