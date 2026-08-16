@@ -26,7 +26,6 @@ async def premium_menu(callback: CallbackQuery, session: AsyncSession):
     await callback.answer()
 
 async def show_premium_for_message(message: Message, session: AsyncSession):
-    """Функция для вызова из menu.py при нажатии кнопки 'Купить премиум'"""
     user = await crud.get_user_by_telegram_id(session, message.from_user.id)
     if not user:
         await message.answer("Зарегистрируйтесь через /start")
@@ -49,7 +48,18 @@ async def premium_stars(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data == "premium_card")
 async def premium_card(callback: CallbackQuery):
-    await callback.message.edit_text("💳 Оплата картой / СБП временно недоступна. Ведутся технические работы.")
+    text = (
+        "💳 Оплата картой / СБП\n\n"
+        "Тарифы:\n"
+        "• 1 месяц – 150 ₽\n"
+        "• 3 месяца – 350 ₽\n\n"
+        "⚠️ Оплата картой временно недоступна. Ведутся технические работы.\n"
+        "Приносим извинения за неудобства."
+    )
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="premium")]
+    ])
+    await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data.startswith("premium_stars_"))
