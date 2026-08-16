@@ -1,6 +1,6 @@
 from aiogram.fsm.state import State, StatesGroup
 
-class ProfileEdit(StatesGroup):
+class ProfileEditState(StatesGroup):
     name = State()
     gender = State()
     age = State()
