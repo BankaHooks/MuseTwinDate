@@ -76,8 +76,15 @@ async def seed_users():
                 print("Создание новых анкет отменено.")
                 return
 
-        total = 300
+        total = 50
         for i in range(total):
+            gender = random.choice(["Мужской", "Женский"])
+            photo_id = random.randint(1, 99)
+            if gender == "Мужской":
+                photo_url = f"https://randomuser.me/api/portraits/men/{photo_id}.jpg"
+            else:
+                photo_url = f"https://randomuser.me/api/portraits/women/{photo_id}.jpg"
+
             name = random.choice(NAMES)
             age = random.randint(18, 45)
             city = random.choice(CITIES)
@@ -86,11 +93,7 @@ async def seed_users():
             songs = random.sample(SONGS, 3)
             songs_text = ", ".join(songs)
             bio = random.choice(BIOS)
-            gender = random.choice(["Мужской", "Женский"])
             pref_gender = random.choice(PREFERRED_GENDERS)
-            # Генерация портрета человека через pravatar.cc
-            photo_id = random.randint(1, 70)
-            photo_url = f"https://i.pravatar.cc/300?img={photo_id}"
 
             user = User(
                 telegram_id = -i - 1,
@@ -109,10 +112,10 @@ async def seed_users():
                 created_at = datetime.utcnow()
             )
             session.add(user)
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 10 == 0:
                 print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print(f"Готово! Создано {total} тестовых анкет с портретами людей.")
+    print(f"Готово! Создано {total} тестовых анкет с портретами людей (пол соответствует фото).")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())

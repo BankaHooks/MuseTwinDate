@@ -7,7 +7,7 @@ from database import crud
 from states.registration import Registration
 from keyboards.inline import (
     genre_choose_keyboard, gender_choose_keyboard, preferred_gender_keyboard,
-    goal_keyboard, interest_category_keyboard, interest_items_keyboard
+    goal_keyboard, interest_category_keyboard, interest_items_keyboard, welcome_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, normalize_city
@@ -15,8 +15,14 @@ from utils.media import save_photo
 
 router = Router()
 
-def _restore(text):
-    return text.replace("_", " ")
+WELCOME_TEXT = (
+    "Поздравляю, вы попали на запуск MuseTwinDate!\n\n"
+    "Понимаем, что по началу трудно будет найти людей, но если вам интересна идея проекта, "
+    "то, пожалуйста, не бросайте его и старайтесь иногда проверять не появились ли анкеты.\n\n"
+    "А также в честь того, что вы участник первой 1000 пользователей, вы можете получить "
+    "премиум статус, который с каждым обновлением будет давать всё больше функций — "
+    "для этого напишите в лс @danhooks"
+)
 
 @router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
@@ -25,8 +31,16 @@ async def start_command(message: Message, state: FSMContext, session: AsyncSessi
         await state.clear()
         await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_reply_keyboard())
         return
+    await state.set_state("welcome")
+    await message.answer(WELCOME_TEXT, reply_markup=welcome_keyboard())
+
+@router.callback_query(F.data == "welcome_start", StateFilter("welcome"))
+async def welcome_start_registration(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await state.clear()
     await state.set_state(Registration.name)
-    await message.answer("Давайте зарегистрируемся!\nКак вас зовут? (можно пропустить, отправив 'Пропустить')")
+    await callback.message.answer("Давайте зарегистрируемся!\nКак вас зовут? (можно пропустить, отправив 'Пропустить')")
+    await callback.answer()
 
 @router.message(Registration.name)
 async def reg_name(message: Message, state: FSMContext):
@@ -112,7 +126,7 @@ async def reg_goal(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.interests), F.data.startswith("cat_"))
 async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
-    category = _restore(callback.data.split("_", 1)[1])
+    category = callback.data.split("_", 1)[1].replace("_", " ")
     data = await state.get_data()
     selected = data.get("interests_list", [])
     await state.update_data(current_category=category)
@@ -121,7 +135,7 @@ async def reg_show_interests(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(Registration.interests), F.data.startswith("interest_"))
 async def reg_toggle_interest(callback: CallbackQuery, state: FSMContext):
-    topic = _restore(callback.data.split("_", 1)[1])
+    topic = callback.data.split("_", 1)[1].replace("_", " ")
     data = await state.get_data()
     selected = data.get("interests_list", [])
     if topic in selected:

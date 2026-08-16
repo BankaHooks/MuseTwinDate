@@ -195,3 +195,10 @@ def premium_plans_keyboard():
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def welcome_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="Начать регистрацию", callback_data="welcome_start")],
+        [InlineKeyboardButton(text="Написать в ЛС @danhooks", url="https://t.me/danhooks")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
