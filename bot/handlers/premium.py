@@ -89,6 +89,8 @@ async def stars_pay(callback: CallbackQuery, session: AsyncSession):
         return
     star_prices = {1: 100, 3: 250}
     price_in_stars = star_prices.get(months, 100)
+    price_in_stars = await crud.apply_referral_discount(session, user.id, price_in_stars)
+    price_in_stars = max(price_in_stars, 1)
     prices = [LabeledPrice(label="Премиум", amount=price_in_stars)]
     try:
         await callback.bot.send_invoice(

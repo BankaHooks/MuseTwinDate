@@ -18,15 +18,6 @@ router = Router()
 
 @router.message(CommandStart())
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
-
-    await message.answer(
-            "🎉 MuseTwin только что вышел!\n\n"
-            "Я буду очень благодарен за помощь в развитии — "
-            "зовите друзей, делитесь ссылкой, рассказывайте о боте. "
-            "За активность — приятные бонусы (скидки, премиум и т.п.).\n\n"
-            "Только без спама, пожалуйста 🙂"
-        )
-
     args = message.text.split()
     ref_code = None
     if len(args) > 1 and args[1].startswith("ref_"):
@@ -37,6 +28,15 @@ async def start_command(message: Message, state: FSMContext, session: AsyncSessi
         await message.answer("Вы уже зарегистрированы. Используйте меню.", reply_markup=main_reply_keyboard())
         await state.clear()
         return
+
+    await message.answer(
+            "🎉 MuseTwin только что вышел!\n\n"
+            "Я буду очень благодарен за помощь в развитии — "
+            "зовите друзей, делитесь ссылкой, рассказывайте о боте. "
+            "За активность — приятные бонусы (скидки, премиум и т.п.).\n\n"
+            "Только без спама, пожалуйста 🙂"
+        )
+
     await state.update_data(ref_code=ref_code)
     await state.set_state(RegistrationState.name)
     await message.answer("Добро пожаловать в MuseTwin – знакомства по музыке!\n\nДавайте познакомимся. Как вас зовут?")
@@ -271,7 +271,7 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
 
     # Генерация реферального кода для нового пользователя
     if not user.referral_code:
-        user.referral_code = await crud.generate_referral_code(user.telegram_id)
+        user.referral_code = await crud.generate_referral_code(session, user.telegram_id)
         await session.commit()
 
     await state.clear()

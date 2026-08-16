@@ -2,6 +2,7 @@ from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 from typing import List, Optional
+import secrets
 from .models import User, Like, Skip, Block, Report, Chat, Payment, BlindDate
 
 async def create_user(session: AsyncSession, telegram_id: int, username: str = None, **kwargs) -> User:
@@ -255,8 +256,13 @@ async def get_active_blind_date(session: AsyncSession, user_id: int) -> Optional
     )
     return result.scalar_one_or_none()
 
-async def generate_referral_code(telegram_id: int) -> str:
-    return f"ref_{telegram_id}"
+async def generate_referral_code(session: AsyncSession, telegram_id: int) -> str:
+    for _ in range(5):
+        code = f"ref_{secrets.token_urlsafe(6)}"
+        existing = await get_user_by_referral_code(session, code)
+        if not existing:
+            return code
+    return f"ref_{secrets.token_urlsafe(6)}{telegram_id}"
 
 async def get_user_by_referral_code(session: AsyncSession, code: str) -> Optional[User]:
     result = await session.execute(select(User).where(User.referral_code == code))

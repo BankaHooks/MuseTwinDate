@@ -212,7 +212,6 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
     ])
     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
-    await state.clear()
 
 @router.callback_query(F.data.startswith("admin_send_"))
 async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
