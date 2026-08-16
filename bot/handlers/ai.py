@@ -19,7 +19,7 @@ async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Эта функция доступна только с премиум-подпиской!", show_alert=True)
         return
     await callback.message.edit_text("Доступные премиум-функции:", reply_markup=premium_features_keyboard())
-    await callback.answer()
+    await callback.answer() 
 
 @router.callback_query(F.data == "premium_features")
 async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
@@ -125,3 +125,18 @@ async def reset_history(callback: CallbackQuery, session: AsyncSession):
     await session.commit()
     await callback.message.edit_text("История лайков и скипов сброшена. Вы можете начать поиск заново!", reply_markup=premium_features_keyboard())
     await callback.answer()
+
+@router.message(F.text == "Премиум-функции")
+async def premium_features_text_handler(message: Message, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    if not user:
+        await message.answer("Зарегистрируйтесь через /start")
+        return
+    if not user.is_premium:
+        await message.answer(
+            "⚡ Эта функция доступна только с премиум-подпиской!\n"
+            "Купите премиум в разделе «Купить премиум»."
+        )
+        return
+    from keyboards.inline import premium_features_keyboard
+    await message.answer("Доступные премиум-функции:", reply_markup=premium_features_keyboard())
