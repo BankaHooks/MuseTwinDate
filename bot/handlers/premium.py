@@ -6,6 +6,12 @@ from database import crud
 from keyboards.reply import main_reply_keyboard
 from utils.payments import PLANS, create_invoice_payload, get_premium_expiry
 from config import config
+from keyboards.inline import (
+    premium_payment_methods_keyboard,
+    premium_stars_plans_keyboard,
+    premium_rub_plans_keyboard,
+    main_menu_keyboard
+)
 
 router = Router()
 
@@ -18,13 +24,32 @@ async def premium_show(callback: CallbackQuery, session: AsyncSession):
     status = "Активен" if user.is_premium else "Неактивен"
     expiry = f" (до {user.premium_expiry.strftime('%Y-%m-%d')})" if user.premium_expiry else ""
     text = f"⭐ Премиум: {status}{expiry}\n\nВыберите способ оплаты:"
-    kb = premium_plans_keyboard()
-    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.message.edit_text(text, reply_markup=premium_payment_methods_keyboard())
     await callback.answer()
 
-@router.callback_query(F.data.startswith("premium_1") | F.data.startswith("premium_3"))
-async def premium_plan(callback: CallbackQuery, session: AsyncSession):
-    plan_key = callback.data.split("_")[1]
+@router.callback_query(F.data == "premium_back")
+async def premium_back(callback: CallbackQuery):
+    await premium_show(callback, None)  # session не нужен для клавиатуры, но для функции нужен, передаём None
+
+@router.callback_query(F.data == "premium_stars")
+async def premium_stars_method(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "Выберите тариф в звёздах:",
+        reply_markup=premium_stars_plans_keyboard()
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "premium_card")
+async def premium_card_method(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "Выберите тариф в рублях (оплата картой / СБП):",
+        reply_markup=premium_rub_plans_keyboard()
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("premium_stars_"))
+async def premium_stars_plan(callback: CallbackQuery, session: AsyncSession):
+    plan_key = callback.data.split("_")[2]
     if plan_key not in ["1", "3"]:
         await callback.answer("Неверный план.")
         return
@@ -54,17 +79,28 @@ async def premium_plan(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Ошибка при создании счёта. Попробуйте позже.", show_alert=True)
         print(f"Invoice error: {e}")
 
-@router.callback_query(F.data == "premium_card")
-async def premium_card(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("premium_rub_"))
+async def premium_rub_plan(callback: CallbackQuery):
+    plan_key = callback.data.split("_")[2]
+    if plan_key == "1":
+        price = "150 ₽"
+        plan_desc = "1 месяц"
+    elif plan_key == "3":
+        price = "350 ₽"
+        plan_desc = "3 месяца"
+    else:
+        await callback.answer("Неверный план.")
+        return
     await callback.answer(
-        "Оплата картой будет доступна после подключения ЮKassa.\n"
-        "Пожалуйста, используйте Telegram Stars.",
+        f"Оплата картой временно недоступна.\n"
+        f"Вы выбрали тариф: {plan_desc} за {price}.\n"
+        f"Пожалуйста, используйте оплату звёздами.",
         show_alert=True
     )
     await callback.message.edit_text(
         "Оплата картой временно недоступна.\n"
         "Выберите оплату через Telegram Stars.",
-        reply_markup=premium_plans_keyboard()
+        reply_markup=premium_stars_plans_keyboard()
     )
 
 @router.pre_checkout_query()

@@ -183,12 +183,27 @@ def report_reason_keyboard():
     buttons.append([InlineKeyboardButton(text="Отмена", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def premium_plans_keyboard():
+def premium_payment_methods_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="1 месяц – 100 ⭐ (150 ₽)", callback_data="premium_1")],
-        [InlineKeyboardButton(text="3 месяца – 250 ⭐ (350 ₽)", callback_data="premium_3")],
-        [InlineKeyboardButton(text="Оплатить картой (СБП)", callback_data="premium_card")],
+        [InlineKeyboardButton(text="⭐ Купить за звёзды", callback_data="premium_stars")],
+        [InlineKeyboardButton(text="💳 Оплатить картой / СБП", callback_data="premium_card")],
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def premium_stars_plans_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="1 месяц – 100 ⭐", callback_data="premium_stars_1")],
+        [InlineKeyboardButton(text="3 месяца – 250 ⭐", callback_data="premium_stars_3")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="premium_back")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def premium_rub_plans_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="1 месяц – 150 ₽", callback_data="premium_rub_1")],
+        [InlineKeyboardButton(text="3 месяца – 350 ₽", callback_data="premium_rub_3")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="premium_back")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
