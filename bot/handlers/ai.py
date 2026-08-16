@@ -330,12 +330,16 @@ async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Это свидание уже неактивно.", show_alert=True)
         return
 
-    user_id = callback.from_user.id
-    if blind_date.user1_id != user_id and blind_date.user2_id != user_id:
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Пользователь не найден.", show_alert=True)
+        return
+
+    if blind_date.user1_id != user.id and blind_date.user2_id != user.id:
         await callback.answer("Вы не участник этого свидания.", show_alert=True)
         return
 
-    both_listened = await crud.mark_blind_date_listened(session, blind_date_id, user_id)
+    both_listened = await crud.mark_blind_date_listened(session, blind_date_id, user.id)
     await callback.answer("Отлично! Ждём партнёра.")
 
     if both_listened:
@@ -394,8 +398,12 @@ async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Это свидание уже неактивно.", show_alert=True)
         return
 
-    user_id = callback.from_user.id
-    if blind_date.user1_id != user_id and blind_date.user2_id != user_id:
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Пользователь не найден.", show_alert=True)
+        return
+
+    if blind_date.user1_id != user.id and blind_date.user2_id != user.id:
         await callback.answer("Вы не участник этого свидания.", show_alert=True)
         return
 
