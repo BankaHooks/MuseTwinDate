@@ -10,6 +10,9 @@ def main_reply_keyboard():
             KeyboardButton(text="Лайки"),
             KeyboardButton(text="Купить премиум"),
         ],
+        [
+            KeyboardButton(text="Премиум-функции"),
+        ],
     ]
     return ReplyKeyboardMarkup(
         keyboard=buttons,

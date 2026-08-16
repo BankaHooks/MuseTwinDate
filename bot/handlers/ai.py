@@ -4,11 +4,22 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from utils.ai import generate_icebreakers, analyze_music_taste, get_match_recommendation, generate_blind_date_questions
-from keyboards.inline import premium_features_keyboard, browse_actions_keyboard
-from keyboards.reply import main_reply_keyboard
+from keyboards.inline import premium_features_keyboard
 import random
 
 router = Router()
+
+@router.callback_query(F.data == "show_premium_features")
+async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+    if not user.is_premium:
+        await callback.answer("Эта функция доступна только с премиум-подпиской!", show_alert=True)
+        return
+    await callback.message.edit_text("Доступные премиум-функции:", reply_markup=premium_features_keyboard())
+    await callback.answer()
 
 @router.callback_query(F.data == "premium_features")
 async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):

@@ -1,7 +1,7 @@
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from keyboards.reply import main_reply_keyboard
@@ -50,3 +50,18 @@ async def likes_button_handler(message: Message, state: FSMContext, session: Asy
 @router.message(F.text == "Купить премиум")
 async def premium_button_handler(message: Message, session: AsyncSession):
     await show_premium_for_message(message, session)
+
+@router.message(F.text == "Премиум-функции")
+async def premium_features_button_handler(message: Message, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    if not user:
+        await message.answer("Зарегистрируйтесь через /start")
+        return
+    if not user.is_premium:
+        await message.answer(
+            "⚡ Эта функция доступна только с премиум-подпиской!\n"
+            "Купите премиум в разделе «Купить премиум»."
+        )
+        return
+    from keyboards.inline import premium_features_keyboard
+    await message.answer("Доступные премиум-функции:", reply_markup=premium_features_keyboard())

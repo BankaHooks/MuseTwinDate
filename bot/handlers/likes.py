@@ -84,42 +84,59 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
     if not target:
         await callback.answer("Пользователь не найден.")
         return
-    like = await crud.create_like(session, user.id, target.id)
-    total_likes = await get_likes_count(session, target.id)
+    # Проверка, не лайкал ли уже
+    existing = await crud.create_like(session, user.id, target.id)
+    if existing and existing.is_mutual:
+        await callback.answer("Уже взаимно!")
+        return
+    like = existing if existing else await crud.create_like(session, user.id, target.id)
+    # уведомление о количестве лайков
+    total_likes = await crud.get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
+        display_count = "9+" if count > 9 else str(count)
         if count == 1:
             text = "Вас лайкнул 1 человек."
-        elif count in (2, 3, 4):
-            text = f"Вас лайкнули {count} человека."
+        elif 2 <= count <= 4:
+            text = f"Вас лайкнули {display_count} человека."
         else:
-            text = f"Вас лайкнули {count} человек."
-        await callback.bot.send_message(target.telegram_id, text)
-        target.last_like_notification_count = count
-        await session.commit()
+            text = f"Вас лайкнули {display_count} человек."
+        try:
+            await callback.bot.send_message(target.telegram_id, text)
+            target.last_like_notification_count = count
+            await session.commit()
+        except:
+            pass
     if like.is_mutual:
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"
-        await callback.bot.send_message(
-            target.telegram_id,
-            f"Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
-            f"Напишите ему: {user_link}",
-            parse_mode="Markdown"
-        )
-        await callback.bot.send_message(
-            user.telegram_id,
-            f"Взаимный лайк! Вы и {target.name or target.username} понравились друг другу.\n"
-            f"Напишите ему: {target_link}",
-            parse_mode="Markdown"
-        )
+        try:
+            await callback.bot.send_message(
+                target.telegram_id,
+                f"Взаимный лайк! Вы и {user.name or user.username} понравились друг другу.\n"
+                f"Напишите ему: {user_link}",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
+        try:
+            await callback.bot.send_message(
+                user.telegram_id,
+                f"Взаимный лайк! Вы и {target.name or target.username} понравились друг другу.\n"
+                f"Напишите ему: {target_link}",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
         await callback.answer("Это взаимно!")
     else:
         await callback.answer("Вы лайкнули в ответ!")
+    # Переход к следующей анкете в лайках
     data = await state.get_data()
     idx = data.get("current_index", 0)
     await state.update_data(current_index=idx + 1)
     await show_like_card(callback.message, state, session, edit=True)
-
+    
 @router.callback_query(F.data.startswith("skip_like_"))
 async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
