@@ -98,7 +98,6 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
-    # Удаляем только скипы, лайки НЕ удаляем
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
     await session.commit()
     await state.clear()
@@ -143,23 +142,22 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             logger.error(f"Failed to send like count notification: {e}")
 
     if like.is_mutual:
-        safe_user_name = escape_markdown(user.name or user.username)
-        safe_candidate_name = escape_markdown(candidate.name or candidate.username)
-        user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
-        candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
+        # Экранируем имена, но отправляем без Markdown, чтобы избежать ошибок парсинга
+        safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
+        safe_candidate_name = escape_markdown(candidate.name or candidate.username or "Пользователь")
+        user_link = f"@{user.username}" if user.username else f"профиль (tg://user?id={user.telegram_id})"
+        candidate_link = f"@{candidate.username}" if candidate.username else f"профиль (tg://user?id={candidate.telegram_id})"
         try:
             await callback.bot.send_message(
                 candidate.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\nНапишите ему: {user_link}",
-                parse_mode="Markdown"
+                f"💞 Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\nНапишите ему: {user_link}"
             )
         except Exception as e:
             logger.error(f"Mutual like to candidate failed: {e}")
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_candidate_name}** понравились друг другу.\nНапишите ему: {candidate_link}",
-                parse_mode="Markdown"
+                f"💞 Взаимный лайк! Вы и {safe_candidate_name} понравились друг другу.\nНапишите ему: {candidate_link}"
             )
         except Exception as e:
             logger.error(f"Mutual like to user failed: {e}")

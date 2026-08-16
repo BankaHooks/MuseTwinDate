@@ -118,13 +118,12 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
         safe_target_name = escape_markdown(target.name or target.username or "Пользователь")
-        user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
-        target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"
+        user_link = f"@{user.username}" if user.username else f"профиль (tg://user?id={user.telegram_id})"
+        target_link = f"@{target.username}" if target.username else f"профиль (tg://user?id={target.telegram_id})"
         try:
             await callback.bot.send_message(
                 target.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\nНапишите ему: {user_link}",
-                parse_mode="Markdown"
+                f"💞 Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\nНапишите ему: {user_link}"
             )
             logger.info(f"Mutual like notification sent to {target.telegram_id}")
         except Exception as e:
@@ -132,8 +131,7 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_target_name}** понравились друг другу.\nНапишите ему: {target_link}",
-                parse_mode="Markdown"
+                f"💞 Взаимный лайк! Вы и {safe_target_name} понравились друг другу.\nНапишите ему: {target_link}"
             )
             logger.info(f"Mutual like notification sent to {user.telegram_id}")
         except Exception as e:

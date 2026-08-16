@@ -16,13 +16,22 @@ from states.registration import RegistrationState
 from states.profile_edit import ProfileEditState
 from utils.helpers import validate_age, normalize_city, validate_text_length
 from utils.security import escape_markdown
+from config import config
 import logging
 
 logger = logging.getLogger(__name__)
 router = Router()
 
+# ID бота (известен из логов)
+BOT_ID = 8636186289
+
 @router.message(CommandStart())
 async def start_command(message: Message, state: FSMContext, session: AsyncSession):
+    # Запрещаем регистрацию для самого бота
+    if message.from_user.id == BOT_ID:
+        await message.answer("Этот бот не может быть зарегистрирован как пользователь.")
+        return
+
     args = message.text.split()
     ref_code = None
     if len(args) > 1 and args[1].startswith("ref_"):
