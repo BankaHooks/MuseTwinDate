@@ -202,3 +202,13 @@ def welcome_keyboard():
         [InlineKeyboardButton(text="Написать в ЛС @danhooks", url="https://t.me/danhooks")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def premium_features_keyboard():
+    buttons = [
+        [InlineKeyboardButton(text="AI-подбор пары", callback_data="ai_match")],
+        [InlineKeyboardButton(text="Мой музыкальный профиль", callback_data="ai_music_profile")],
+        [InlineKeyboardButton(text="Свидание вслепую", callback_data="blind_date")],
+        [InlineKeyboardButton(text="Сбросить историю", callback_data="reset_history")],
+        [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

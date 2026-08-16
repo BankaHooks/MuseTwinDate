@@ -42,6 +42,9 @@ class User(Base):
     blocks_received = relationship("Block", foreign_keys="Block.blocked_id", back_populates="blocked")
     reports_sent = relationship("Report", foreign_keys="Report.reporter_id", back_populates="reporter")
 
+    last_reset = Column(DateTime, nullable=True)
+    embedding = Column(Text, nullable=True)  
+
 class Like(Base):
     __tablename__ = "likes"
     id = Column(Integer, primary_key=True)

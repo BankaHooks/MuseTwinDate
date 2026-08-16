@@ -12,6 +12,7 @@ from keyboards.inline import (
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, normalize_city
 from utils.media import save_photo
+from utils.embeddings import update_user_embedding
 
 router = Router()
 
@@ -216,9 +217,10 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
                 bio=data.get("bio"),
                 photo_file_id=photo_file_id,
             )
+            await update_user_embedding(session, user)
             await message.answer("Профиль обновлён!", reply_markup=main_reply_keyboard())
     else:
-        await crud.create_user(
+        user = await crud.create_user(
             session,
             telegram_id=message.from_user.id,
             username=message.from_user.username,
@@ -235,6 +237,7 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
             bio=data.get("bio"),
             photo_file_id=photo_file_id,
         )
+        await update_user_embedding(session, user)
         await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
     await state.clear()
 

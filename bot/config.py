@@ -15,4 +15,6 @@ class Config:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     MUSIC_DATASET_PATH = os.getenv("MUSIC_DATASET_PATH", "")
     MINI_APP_URL = os.getenv("MINI_APP_URL", "https://bankahooks.github.io/MuseTwinDate/")
+    NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+    NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
 config = Config()
