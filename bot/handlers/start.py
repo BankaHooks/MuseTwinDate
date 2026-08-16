@@ -3,12 +3,12 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 from database import crud
 from database.models import User
 from keyboards.inline import (
     welcome_keyboard, main_menu_keyboard, gender_choose_keyboard,
-    genre_choose_keyboard, goal_keyboard, interest_category_keyboard,
+    genre_category_keyboard, genre_items_keyboard,
+    goal_keyboard, interest_category_keyboard,
     interest_items_keyboard, games_category_keyboard, games_items_keyboard
 )
 from keyboards.reply import main_reply_keyboard
@@ -16,7 +16,6 @@ from states.registration import RegistrationState
 from states.profile_edit import ProfileEditState
 from utils.helpers import validate_age, normalize_city, validate_text_length
 from utils.security import escape_markdown
-from config import config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,28 +90,53 @@ async def process_city(message: Message, state: FSMContext):
     city = normalize_city(city)
     await state.update_data(city=city)
     await state.set_state(RegistrationState.genres)
-    await message.answer("Выберите ваши любимые музыкальные жанры (можно несколько, нажимайте на них, затем кнопка «Готово»):", reply_markup=genre_choose_keyboard())
+    await message.answer("Выберите ваши любимые музыкальные жанры (можно несколько, нажимайте на них, затем кнопка «Готово»):", reply_markup=genre_category_keyboard())
 
-@router.callback_query(F.data.startswith("genre_add_"), RegistrationState.genres)
-async def process_genre_add(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 1)[1]
+@router.callback_query(F.data.startswith("genre_cat_"), RegistrationState.genres)
+async def genre_category_selected(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_", 1)[1]
+    category = category.replace("_", " ").strip()
     data = await state.get_data()
-    genres = data.get("genres", [])
-    if genre not in genres:
-        genres.append(genre)
-        await state.update_data(genres=genres)
-        await callback.answer(f"Добавлено: {genre}")
+    selected = data.get("selected_genres", [])
+    await state.update_data(current_genre_category=category)
+    markup = genre_items_keyboard(category, selected)
+    await callback.message.edit_text(f"Выберите жанры в категории «{category}»:", reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("genre_item_"), RegistrationState.genres)
+async def genre_item_selected(callback: CallbackQuery, state: FSMContext):
+    genre = callback.data.split("_", 1)[1]
+    genre = genre.replace("_", " ")
+    data = await state.get_data()
+    selected = data.get("selected_genres", [])
+    if genre in selected:
+        selected.remove(genre)
+        await callback.answer(f"Удалено: {genre}")
     else:
-        await callback.answer("Уже добавлено")
+        if len(selected) >= 15:
+            await callback.answer("Максимум 15 жанров.", show_alert=True)
+            return
+        selected.append(genre)
+        await callback.answer(f"Добавлено: {genre}")
+    await state.update_data(selected_genres=selected)
+    category = data.get("current_genre_category", "")
+    if category:
+        markup = genre_items_keyboard(category, selected)
+        await callback.message.edit_reply_markup(reply_markup=markup)
+
+@router.callback_query(F.data == "genre_back", RegistrationState.genres)
+async def genre_back(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Выберите категорию жанров:", reply_markup=genre_category_keyboard())
+    await callback.answer()
 
 @router.callback_query(F.data == "genres_done", RegistrationState.genres)
-async def process_genres_done(callback: CallbackQuery, state: FSMContext):
+async def genres_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    genres = data.get("genres", [])
-    if not genres:
+    selected = data.get("selected_genres", [])
+    if not selected:
         await callback.answer("Выберите хотя бы один жанр!", show_alert=True)
         return
-    await state.update_data(genres=", ".join(genres))
+    await state.update_data(genres=", ".join(selected))
     await state.set_state(RegistrationState.bands)
     await callback.message.delete()
     await callback.message.answer("Напишите ваши любимые музыкальные группы (до 5, через запятую):")
@@ -335,23 +359,6 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
     if not user.referral_code:
         user.referral_code = await crud.generate_referral_code(session, user.telegram_id)
         await session.commit()
-
-    # Уведомление админам о новом пользователе
-    for admin_id in config.ADMIN_IDS:
-        try:
-            await bot.send_message(
-                admin_id,
-                f"🆕 Новый пользователь!\n"
-                f"ID: {user.id}\n"
-                f"Telegram ID: {user.telegram_id}\n"
-                f"Имя: {user.name or 'Не указано'}\n"
-                f"Возраст: {user.age or 'Не указан'}\n"
-                f"Город: {user.city or 'Не указан'}\n"
-                f"Username: @{user.username if user.username else 'Нет'}\n"
-                f"Время: {datetime.utcnow().strftime('%d.%m.%Y %H:%M UTC')}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to send admin notification: {e}")
 
     await state.clear()
     await message.answer(
