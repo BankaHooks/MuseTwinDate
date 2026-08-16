@@ -1,6 +1,5 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from utils.horoscope import ZODIAC_SIGNS, get_daily_horoscope
 
@@ -8,7 +7,6 @@ router = Router()
 
 def zodiac_keyboard():
     buttons = []
-    # Разбиваем на 3 колонки
     row = []
     for i, sign in enumerate(ZODIAC_SIGNS):
         row.append(InlineKeyboardButton(text=sign, callback_data=f"zodiac_{sign}"))
