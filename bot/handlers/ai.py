@@ -2,16 +2,18 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, or_, and_
+from sqlalchemy import delete, or_, and_, select
 from datetime import datetime, timedelta
 import random
 import asyncio
 from database import crud
 from database.models import Skip, Like, BlindDate
 from utils.ai import analyze_music_taste, generate_blind_date_questions
-from utils.matching import get_candidates_sorted, calculate_match_score
-from keyboards.inline import premium_features_keyboard, browse_actions_keyboard, gaming_categories_keyboard, gaming_games_keyboard
-from keyboards.reply import main_reply_keyboard
+from utils.matching import get_candidates_sorted
+from keyboards.inline import (
+    premium_features_keyboard, browse_actions_keyboard,
+    gaming_categories_keyboard, gaming_games_keyboard
+)
 from utils.security import escape_markdown
 from states.browse import Browse
 from config import config
@@ -20,6 +22,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
+# Список популярных песен (используется для свидания вслепую)
 POPULAR_SONGS = [
     ("Queen", "Bohemian Rhapsody"),
     ("John Lennon", "Imagine"),
@@ -165,6 +168,12 @@ POPULAR_SONGS = [
     ("Queen", "Fat Bottomed Girls")
 ]
 
+async def edit_or_caption(callback: CallbackQuery, text: str, reply_markup=None, parse_mode=None):
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    else:
+        await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+
 @router.callback_query(F.data == "show_premium_features")
 async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -172,9 +181,9 @@ async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Зарегистрируйтесь через /start")
         return
     if not user.is_premium:
-        await callback.answer("Эта функция доступна только с премиум-подпиской!", show_alert=True)
+        await callback.answer("Только для премиум!", show_alert=True)
         return
-    await callback.message.edit_text("Доступные премиум-функции:", reply_markup=premium_features_keyboard())
+    await edit_or_caption(callback, "Доступные премиум-функции:", reply_markup=premium_features_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "ai_match")
@@ -184,31 +193,22 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
         await callback.answer("Только для премиум!", show_alert=True)
         return
 
-    # Получаем топ-5 кандидатов
-    scored_candidates = await get_candidates_sorted(session, user, limit=5)
-    if not scored_candidates:
-        await callback.message.edit_text("Нет подходящих кандидатов для AI-подбора.")
+    scored = await get_candidates_sorted(session, user, limit=5)
+    if not scored:
+        await edit_or_caption(callback, "😕 Нет подходящих кандидатов для AI-подбора.\nПопробуйте позже или измените настройки поиска.")
+        await callback.answer()
         return
 
-    # Сохраняем список в состоянии
-    candidates_data = []
-    for candidate, score in scored_candidates:
-        candidates_data.append({
-            "id": candidate.id,
-            "score": round(score * 100)
-        })
+    candidates_data = [{"id": cand.id, "score": round(score*100)} for cand, score in scored]
     await state.update_data(ai_candidates=candidates_data, ai_index=0)
-
-    # Показываем первого кандидата
-    await show_ai_candidate(callback.message, state, session, edit=False)
+    await show_ai_candidate(callback.message, state, session, edit=False, bot=callback.bot)
     await callback.answer()
 
-async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, edit: bool = False):
+async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, edit: bool, bot=None):
     data = await state.get_data()
     candidates = data.get("ai_candidates", [])
     index = data.get("ai_index", 0)
     if not candidates or index >= len(candidates):
-        # Конец списка
         text = "Вы просмотрели всех AI-рекомендованных кандидатов."
         markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔙 Назад к премиум-функциям", callback_data="show_premium_features")]
@@ -224,23 +224,12 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
     score = candidates[index]["score"]
     candidate = await crud.get_user_by_id(session, candidate_id)
     if not candidate:
-        # Пропускаем невалидного
-        await state.update_data(ai_index=index + 1)
-        await show_ai_candidate(target, state, session, edit=edit)
+        await state.update_data(ai_index=index+1)
+        await show_ai_candidate(target, state, session, edit=edit, bot=bot)
         return
 
-    # Формируем карточку
     from utils.helpers import format_user_card
     text = format_user_card(candidate, score)
-    # Добавляем пояснение (если есть AI-ключ)
-    if config.GIGACHAT_API_KEY:
-        try:
-            from utils.ai import get_match_explanation
-            explanation = await get_match_explanation(user, candidate, score)
-            text += f"\n\n🤖 AI-пояснение: {explanation}"
-        except Exception as e:
-            logger.error(f"AI explanation error: {e}")
-
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"ai_like_{candidate_id}"),
          InlineKeyboardButton(text="⏭️ Скип", callback_data=f"ai_skip_{candidate_id}")],
@@ -250,10 +239,7 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
 
     if edit:
         if candidate.photo_file_id:
-            await target.edit_media(
-                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
-                reply_markup=markup
-            )
+            await target.edit_media(InputMediaPhoto(media=candidate.photo_file_id, caption=text), reply_markup=markup)
         else:
             await target.edit_text(text, reply_markup=markup)
     else:
@@ -266,40 +252,24 @@ async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, ed
 async def ai_like(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     candidate_id = int(callback.data.split("_")[2])
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    if not user:
-        await callback.answer("Ошибка")
-        return
-    if not await crud.can_like(session, user):
-        await callback.answer("Лимит лайков исчерпан", show_alert=True)
+    if not user or not await crud.can_like(session, user):
+        await callback.answer("Лимит лайков", show_alert=True)
         return
     candidate = await crud.get_user_by_id(session, candidate_id)
-    if not candidate:
-        await callback.answer("Анкета не найдена")
-        return
-    like = await crud.create_like(session, user.id, candidate.id)
-    await crud.increment_likes(session, user)
-    if like.is_mutual:
-        await callback.answer("Взаимный лайк! 💞", show_alert=True)
-        # Отправка уведомлений о взаимности
-        try:
-            user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
-            candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
-            await callback.bot.send_message(
-                candidate.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{user.name or user.username}** понравились друг другу.\nНапишите ему: {user_link}",
-                parse_mode="Markdown"
-            )
-            await callback.bot.send_message(
-                user.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{candidate.name or candidate.username}** понравились друг другу.\nНапишите ему: {candidate_link}",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Mutual like notifications error: {e}")
+    if candidate:
+        like = await crud.create_like(session, user.id, candidate.id)
+        await crud.increment_likes(session, user)
+        if like.is_mutual:
+            await callback.answer("Взаимно! 💞", show_alert=True)
+            # уведомления (можно добавить)
+        else:
+            await callback.answer("Лайк поставлен!")
     else:
-        await callback.answer("Лайк поставлен!")
-    await state.update_data(ai_index=state.get_data().get("ai_index", 0) + 1)
+        await callback.answer("Ошибка")
+    data = await state.get_data()
+    await state.update_data(ai_index=data.get("ai_index", 0)+1)
     await show_ai_candidate(callback.message, state, session, edit=True)
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("ai_skip_"))
 async def ai_skip(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -307,7 +277,8 @@ async def ai_skip(callback: CallbackQuery, state: FSMContext, session: AsyncSess
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         await crud.create_skip(session, user.id, candidate_id)
-    await state.update_data(ai_index=state.get_data().get("ai_index", 0) + 1)
+    data = await state.get_data()
+    await state.update_data(ai_index=data.get("ai_index", 0)+1)
     await show_ai_candidate(callback.message, state, session, edit=True)
     await callback.answer()
 
@@ -320,13 +291,13 @@ async def ai_list(callback: CallbackQuery, state: FSMContext, session: AsyncSess
         return
     text = "📋 Список AI-рекомендованных:\n\n"
     for idx, c in enumerate(candidates):
-        user_obj = await crud.get_user_by_id(session, c["id"])
-        if user_obj:
-            text += f"{idx+1}. {user_obj.name or 'Без имени'} — {c['score']}%\n"
+        u = await crud.get_user_by_id(session, c["id"])
+        if u:
+            text += f"{idx+1}. {u.name or 'Без имени'} — {c['score']}%\n"
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 К текущему кандидату", callback_data="ai_back_to_current")]
+        [InlineKeyboardButton(text="🔙 К текущему", callback_data="ai_back_to_current")]
     ])
-    await callback.message.edit_text(text, reply_markup=markup)
+    await edit_or_caption(callback, text, reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "ai_back_to_current")
@@ -341,14 +312,14 @@ async def ai_music_profile(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Только для премиум!", show_alert=True)
         return
     if not config.GIGACHAT_API_KEY:
-        await callback.message.edit_text("AI-функции недоступны: отсутствует API-ключ GigaChat.", reply_markup=premium_features_keyboard())
+        await edit_or_caption(callback, "AI-функции недоступны: отсутствует API-ключ GigaChat.", reply_markup=premium_features_keyboard())
         return
-    await callback.message.edit_text("Анализируем ваш музыкальный вкус...")
+    await edit_or_caption(callback, "Анализируем ваш музыкальный вкус...")
     analysis = await analyze_music_taste(user)
-    await callback.message.edit_text(f"🎵 Ваш музыкальный профиль:\n\n{analysis}", reply_markup=premium_features_keyboard())
+    await edit_or_caption(callback, f"🎵 Ваш музыкальный профиль:\n\n{analysis}", reply_markup=premium_features_keyboard())
     await callback.answer()
 
-# ===================== Свидание вслепую (исправленное) =====================
+# ==================== Свидание вслепую ====================
 
 @router.callback_query(F.data == "blind_date")
 async def blind_date(callback: CallbackQuery, session: AsyncSession):
@@ -357,7 +328,7 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Только для премиум!", show_alert=True)
         return
 
-    # Проверяем активное свидание (где user1 или user2, и не оба listened)
+    # Проверяем активное свидание
     active = await session.execute(
         select(BlindDate).where(
             or_(
@@ -371,16 +342,16 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("У вас уже есть активное свидание! Дождитесь партнёра.", show_alert=True)
         return
 
-    # Ищем партнёра
+    # Берём пул кандидатов
     candidates = await crud.get_candidate_pool(session, user.id, limit=50)
     if not candidates:
-        await callback.message.edit_text("Нет подходящих кандидатов для свидания вслепую.")
+        await edit_or_caption(callback, "😕 Нет подходящих кандидатов для свидания вслепую.\nПопробуйте позже.")
+        await callback.answer()
         return
-    partner = random.choice(candidates)
 
+    partner = random.choice(candidates)
     artist, song = random.choice(POPULAR_SONGS)
 
-    # Создаём запись
     blind_date_obj = BlindDate(
         user1_id=user.id,
         user2_id=partner.id,
@@ -397,22 +368,18 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
         [InlineKeyboardButton(text="❌ Отменить", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
     ])
-
     safe_artist = escape_markdown(artist)
     safe_song = escape_markdown(song)
     text = (f"🌹 Свидание вслепую с {escape_markdown(partner.name or 'партнёром')}!\n\n"
             f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
-            "Прослушайте и нажмите кнопку.\n"
-            "⏳ Ожидаем партнёра... (автоотмена через 10 мин)")
-
-    await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
+            "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра... (автоотмена через 10 мин)")
+    await edit_or_caption(callback, text, reply_markup=markup, parse_mode="Markdown")
     await callback.answer()
 
-    # Уведомляем партнёра
+    # Уведомление партнёру
     partner_text = (f"🌹 {user.name or 'Кто-то'} пригласил вас на свидание вслепую!\n\n"
                     f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
-                    "Прослушайте и нажмите кнопку.\n"
-                    "⏳ Ожидаем партнёра... (автоотмена через 10 мин)")
+                    "Прослушайте и нажмите «Прослушал».\n⏳ Ожидаем партнёра...")
     partner_markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
         [InlineKeyboardButton(text="❌ Отменить", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
@@ -420,7 +387,7 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     try:
         await callback.bot.send_message(partner.telegram_id, partner_text, reply_markup=partner_markup, parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"Failed to send blind date invitation to partner: {e}")
+        logger.error(f"Не удалось отправить приглашение партнёру: {e}")
 
     # Таймаут 10 минут
     asyncio.create_task(blind_date_timeout(blind_date_obj.id, callback.bot, session.bind))
@@ -432,7 +399,7 @@ async def blind_date_timeout(blind_date_id: int, bot, session_maker):
         if not blind_date:
             return
         if blind_date.user1_listened and blind_date.user2_listened:
-            return  # уже завершено
+            return
         user1 = await crud.get_user_by_id(session, blind_date.user1_id)
         user2 = await crud.get_user_by_id(session, blind_date.user2_id)
         await session.delete(blind_date)
@@ -449,59 +416,33 @@ async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
     blind_date_id = int(callback.data.split("_")[-1])
     blind_date = await session.get(BlindDate, blind_date_id)
     if not blind_date:
-        await callback.answer("Это свидание уже неактивно.", show_alert=True)
+        await callback.answer("Свидание уже неактивно.", show_alert=True)
         return
-
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    if not user:
-        await callback.answer("Ошибка")
+    if not user or (blind_date.user1_id != user.id and blind_date.user2_id != user.id):
+        await callback.answer("Вы не участник", show_alert=True)
         return
 
-    if blind_date.user1_id != user.id and blind_date.user2_id != user.id:
-        await callback.answer("Вы не участник этого свидания.", show_alert=True)
-        return
-
-    # Отмечаем прослушивание
     if blind_date.user1_id == user.id:
         blind_date.user1_listened = True
     else:
         blind_date.user2_listened = True
     await session.commit()
-
     await callback.answer("Отлично! Ждём партнёра.")
 
     if blind_date.user1_listened and blind_date.user2_listened:
-        # Оба прослушали – завершаем
         await callback.message.edit_reply_markup(reply_markup=None)
         user1 = await crud.get_user_by_id(session, blind_date.user1_id)
         user2 = await crud.get_user_by_id(session, blind_date.user2_id)
-
-        def contact_link(u):
-            if u.username:
-                return f"@{u.username}"
-            else:
-                return f"[профиль](tg://user?id={u.telegram_id})"
-
-        link1 = contact_link(user1)
-        link2 = contact_link(user2)
-
-        text1 = (f"💞 Свидание вслепую состоялось!\n"
-                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n"
-                 f"Контакты партнёра: {link2}")
-        text2 = (f"💞 Свидание вслепую состоялось!\n"
-                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n"
-                 f"Контакты партнёра: {link1}")
-        try:
-            await callback.bot.send_message(user1.telegram_id, text1, parse_mode="Markdown")
-        except: pass
-        try:
-            await callback.bot.send_message(user2.telegram_id, text2, parse_mode="Markdown")
-        except: pass
+        link1 = f"@{user1.username}" if user1.username else f"[профиль](tg://user?id={user1.telegram_id})"
+        link2 = f"@{user2.username}" if user2.username else f"[профиль](tg://user?id={user2.telegram_id})"
+        await callback.bot.send_message(user1.telegram_id, f"💞 Свидание состоялось! Контакт партнёра: {link2}", parse_mode="Markdown")
+        await callback.bot.send_message(user2.telegram_id, f"💞 Свидание состоялось! Контакт партнёра: {link1}", parse_mode="Markdown")
         await callback.message.answer("🎉 Свидание завершено! Контакты отправлены.")
         await session.delete(blind_date)
         await session.commit()
     else:
-        await callback.message.answer("✅ Вы подтвердили прослушивание. Ожидаем партнёра...")
+        await callback.message.answer("✅ Вы подтвердили. Ожидаем партнёра...")
 
 @router.callback_query(F.data.startswith("blind_date_cancel_"))
 async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
@@ -510,26 +451,108 @@ async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
     if not blind_date:
         await callback.answer("Уже неактивно", show_alert=True)
         return
-
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user or (blind_date.user1_id != user.id and blind_date.user2_id != user.id):
         await callback.answer("Вы не участник", show_alert=True)
         return
-
-    # Уведомляем другого участника
     other_id = blind_date.user2_id if blind_date.user1_id == user.id else blind_date.user1_id
     other = await crud.get_user_by_id(session, other_id)
     try:
-        await callback.bot.send_message(other.telegram_id, "❌ Свидание вслепую отменено другим участником.")
+        await callback.bot.send_message(other.telegram_id, "❌ Свидание отменено другим участником.")
     except: pass
-
     await session.delete(blind_date)
     await session.commit()
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Свидание отменено.")
     await callback.answer()
 
-# ===================== Конец свидания вслепую =====================
+# ==================== Поиск союзника в игру ====================
+
+@router.callback_query(F.data == "find_gaming_buddy")
+async def find_gaming_buddy(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user or not user.is_premium:
+        await callback.answer("Только для премиум!", show_alert=True)
+        return
+    await edit_or_caption(callback, "Выберите категорию игры:", reply_markup=gaming_categories_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("gaming_cat_"))
+async def gaming_category_chosen(callback: CallbackQuery):
+    category = callback.data.split("_", 1)[1].replace("_", " ").strip()
+    await edit_or_caption(callback, f"Выберите игру в категории «{category}»:", reply_markup=gaming_games_keyboard(category))
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("gaming_game_"))
+async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
+    game = callback.data.split("_", 1)[1].replace("_", " ")
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Ошибка")
+        return
+
+    # Функция get_users_by_game должна быть в database/crud.py
+    players = await crud.get_users_by_game(session, game, user.id, limit=10)
+    if not players:
+        await edit_or_caption(callback,
+            f"🎮 По игре «{game}» никого не найдено.\nПопробуйте другую игру.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔙 К категориям", callback_data="gaming_back")]
+            ])
+        )
+        await callback.answer()
+        return
+
+    text = f"🎮 Найдены союзники по игре «{game}»:\n\n"
+    buttons = []
+    for p in players:
+        name = p.name or p.username or "Без имени"
+        text += f"• {name}"
+        if p.age:
+            text += f", {p.age} лет"
+        if p.city:
+            text += f", {p.city}"
+        text += "\n"
+        row = []
+        row.append(InlineKeyboardButton(text="👤 Профиль", callback_data=f"view_user_{p.id}"))
+        if p.username:
+            row.append(InlineKeyboardButton(text="💬 Написать", url=f"https://t.me/{p.username}"))
+        else:
+            row.append(InlineKeyboardButton(text="💬 Написать", callback_data="no_username"))
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="🔙 К выбору игры", callback_data="gaming_back")])
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await edit_or_caption(callback, text, reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data == "gaming_back")
+async def gaming_back(callback: CallbackQuery):
+    await edit_or_caption(callback, "Выберите категорию игры:", reply_markup=gaming_categories_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "no_username")
+async def no_username(callback: CallbackQuery):
+    await callback.answer("У этого пользователя нет username.", show_alert=True)
+
+@router.callback_query(F.data.startswith("view_user_"))
+async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
+    user_id = int(callback.data.split("_")[2])
+    user_obj = await crud.get_user_by_id(session, user_id)
+    if not user_obj:
+        await callback.answer("Пользователь не найден.")
+        return
+    from utils.helpers import format_user_card
+    text = format_user_card(user_obj)
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="gaming_back")]
+    ])
+    if callback.message.photo:
+        await callback.message.edit_media(InputMediaPhoto(media=user_obj.photo_file_id, caption=text), reply_markup=markup)
+    else:
+        await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+# ==================== Сброс истории ====================
 
 @router.callback_query(F.data == "reset_history")
 async def reset_history(callback: CallbackQuery, session: AsyncSession):
@@ -538,7 +561,7 @@ async def reset_history(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Только для премиум!", show_alert=True)
         return
     if user.last_reset and user.last_reset > datetime.utcnow() - timedelta(days=30):
-        await callback.answer("Вы уже сбрасывали историю в этом месяце. Попробуйте через месяц.", show_alert=True)
+        await callback.answer("Вы уже сбрасывали в этом месяце.", show_alert=True)
         return
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
     await session.execute(delete(Like).where(Like.from_user_id == user.id))
@@ -546,5 +569,5 @@ async def reset_history(callback: CallbackQuery, session: AsyncSession):
     user.last_like_date = None
     user.last_reset = datetime.utcnow()
     await session.commit()
-    await callback.message.edit_text("История лайков и скипов сброшена. Вы можете начать поиск заново!", reply_markup=premium_features_keyboard())
+    await edit_or_caption(callback, "История лайков и скипов сброшена.", reply_markup=premium_features_keyboard())
     await callback.answer()

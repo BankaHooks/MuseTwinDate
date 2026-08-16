@@ -292,6 +292,8 @@ async def update_referral_reminder(session: AsyncSession, user: User):
 
 from utils.helpers import parse_comma_separated
 
+from utils.helpers import parse_comma_separated
+
 async def get_users_by_game(session: AsyncSession, game: str, exclude_user_id: int, limit: int = 10) -> List[User]:
     stmt = select(User).where(
         User.id != exclude_user_id,
