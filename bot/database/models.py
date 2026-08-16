@@ -15,8 +15,6 @@ class User(Base):
     favorite_genres = Column(Text, nullable=True)
     favorite_bands = Column(Text, nullable=True)
     favorite_songs = Column(Text, nullable=True)
-    favorite_albums = Column(Text, nullable=True)
-    favorite_artists = Column(Text, nullable=True)
     search_goal = Column(String(50), nullable=True)
     interests = Column(Text, nullable=True)
     preferred_gender = Column(String(50), nullable=True)

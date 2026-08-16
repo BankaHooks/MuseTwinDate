@@ -10,11 +10,10 @@ from database.models import Skip
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard, profile_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
-from states.report import ReportState
+from states.like_message import LikeMessageState
 from utils.helpers import format_user_card
 from utils.matching import pick_candidate_simple
 from utils.security import escape_markdown
-from states.envelope import EnvelopeState
 
 router = Router()
 
@@ -152,6 +151,72 @@ async def skip_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         await crud.create_skip(session, user.id, candidate_id)
     await show_next(callback, state, session)
 
+@router.callback_query(F.data == "send_envelope", Browse.candidate_id)
+async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    candidate_id = data.get("candidate_id")
+    if not candidate_id:
+        await callback.answer("Нет анкеты.")
+        return
+    await state.update_data(like_target=candidate_id)
+    await state.set_state(LikeMessageState.text)
+    await callback.message.answer("Введите сообщение, которое будет отправлено вместе с лайком:")
+    await callback.answer()
+
+@router.message(LikeMessageState.text)
+async def send_envelope_text(message: Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    target_id = data.get("like_target")
+    if not target_id:
+        await message.answer("Ошибка.")
+        await state.clear()
+        return
+    target = await crud.get_user_by_id(session, target_id)
+    if not target:
+        await message.answer("Пользователь не найден.")
+        await state.clear()
+        return
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    if not await crud.can_like(session, user):
+        await message.answer("Вы исчерпали лимит лайков на сегодня (30). Купите премиум!")
+        await state.clear()
+        return
+    like = await crud.create_like(session, user.id, target.id)
+    await crud.increment_likes(session, user)
+    text = message.text
+    try:
+        await message.bot.send_message(
+            target.telegram_id,
+            f"💌 Вас лайкнул пользователь {user.name or user.username} с сообщением:\n\n{text}"
+        )
+        await message.answer(f"Лайк отправлен! Сообщение: {text}")
+    except Exception as e:
+        await message.answer("Не удалось отправить сообщение.")
+    if like.is_mutual:
+        # уведомление о взаимности уже есть в create_like
+        pass
+    await state.clear()
+    # Переключаем на следующую анкету
+    await show_next_from_message(message, state, session)
+
+async def show_next_from_message(message: Message, state: FSMContext, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
+    candidate, score = await pick_candidate_simple(session, user)
+    if not candidate:
+        await message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=main_reply_keyboard())
+        await state.clear()
+        return
+    await state.update_data(candidate_id=candidate.id)
+    text = format_user_card(candidate, score)
+    markup = browse_actions_keyboard()
+    try:
+        if candidate.photo_file_id:
+            await message.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
+        else:
+            await message.answer(text, reply_markup=markup)
+    except Exception as e:
+        await message.answer(text, reply_markup=markup)
+
 @router.callback_query(F.data == "report_user", Browse.candidate_id)
 async def report_user(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
@@ -173,33 +238,22 @@ async def report_user(callback: CallbackQuery, state: FSMContext, session: Async
     await callback.answer()
 
 @router.callback_query(F.data.startswith("reportreason_"), Browse.candidate_id)
-async def report_reason(callback: CallbackQuery, state: FSMContext):
+async def report_reason(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     reason = callback.data.split("_", 1)[1]
     allowed = ["spam", "inappropriate", "fake", "other"]
     if reason not in allowed:
         await callback.answer("Некорректная причина.", show_alert=True)
         return
-    await state.update_data(report_reason=reason)
-    await state.set_state(ReportState.description)
-    await callback.message.edit_text(
-        "Опишите проблему подробнее (или отправьте 'Пропустить', чтобы оставить пустым):"
-    )
-    await callback.answer()
-
-@router.message(ReportState.description)
-async def report_description(message: Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     target_id = data.get("report_target")
-    reason = data.get("report_reason")
-    if not target_id or not reason:
-        await message.answer("Ошибка: не найдена цель или причина.")
-        await state.clear()
+    if not target_id:
+        await callback.answer("Ошибка: цель не найдена.")
         return
-    description = message.text if message.text.lower() != "пропустить" else None
-    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    await crud.create_report(session, user.id, target_id, reason, description)
-    await message.answer("Жалоба отправлена. Спасибо!", reply_markup=main_reply_keyboard())
-    await state.clear()
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    await crud.create_report(session, user.id, target_id, reason)
+    await callback.answer("Жалоба отправлена. Спасибо.", show_alert=True)
+    await state.update_data(report_target=None)
+    await show_next(callback, state, session)
 
 async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -291,39 +345,3 @@ async def back_to_browse(callback: CallbackQuery, state: FSMContext, session: As
     except Exception as e:
         await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
-
-@router.callback_query(F.data == "send_envelope", Browse.candidate_id)
-async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    candidate_id = data.get("candidate_id")
-    if not candidate_id:
-        await callback.answer("Нет анкеты.")
-        return
-    await state.update_data(envelope_target=candidate_id)
-    await state.set_state(EnvelopeState.text)
-    await callback.message.answer("Введите текст сообщения (конверта), которое будет отправлено этому пользователю анонимно:")
-    await callback.answer()
-
-@router.message(EnvelopeState.text)
-async def send_envelope_text(message: Message, state: FSMContext, session: AsyncSession):
-    data = await state.get_data()
-    target_id = data.get("envelope_target")
-    if not target_id:
-        await message.answer("Ошибка: цель не найдена.")
-        await state.clear()
-        return
-    target = await crud.get_user_by_id(session, target_id)
-    if not target:
-        await message.answer("Пользователь не найден.")
-        await state.clear()
-        return
-    text = message.text
-    await message.answer("Конверт отправлен!")
-    try:
-        await message.bot.send_message(
-            target.telegram_id,
-            f"📩 Вам пришло анонимное сообщение:\n\n{text}"
-        )
-    except Exception as e:
-        await message.answer("Не удалось отправить конверт. Возможно, пользователь заблокировал бота.")
-    await state.clear()

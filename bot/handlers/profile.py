@@ -109,8 +109,7 @@ async def reset_profile(callback: CallbackQuery, state: FSMContext, session: Asy
     await state.update_data(user_id=user.id)
     fields = [
         "name", "gender", "age", "city", "favorite_genres", "favorite_bands",
-        "favorite_songs", "favorite_albums", "favorite_artists", "search_goal",
-        "interests", "preferred_gender", "bio", "photo_file_id"
+        "favorite_songs", "search_goal", "interests", "preferred_gender", "bio", "photo_file_id"
     ]
     for field in fields:
         setattr(user, field, None)
@@ -153,12 +152,6 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
     elif field == "songs":
         await state.set_state(ProfileEdit.songs)
         await callback.message.answer("Введите ваши любимые песни (можно несколько, через запятую):")
-    elif field == "albums":
-        await state.set_state(ProfileEdit.albums)
-        await callback.message.answer("Введите ваши любимые альбомы (можно несколько, через запятую):")
-    elif field == "artists":
-        await state.set_state(ProfileEdit.artists)
-        await callback.message.answer("Введите ваших любимых исполнителей (можно несколько, через запятую):")
     elif field == "goal":
         await state.set_state(ProfileEdit.goal)
         await callback.message.answer("Какова ваша цель знакомства?", reply_markup=goal_keyboard())
@@ -235,22 +228,6 @@ async def edit_songs(message: Message, state: FSMContext, session: AsyncSession)
     await crud.update_user(session, user, favorite_songs=songs)
     await state.clear()
     await message.answer("Песни обновлены", reply_markup=main_reply_keyboard())
-
-@router.message(ProfileEdit.albums)
-async def edit_albums(message: Message, state: FSMContext, session: AsyncSession):
-    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    albums = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
-    await crud.update_user(session, user, favorite_albums=albums)
-    await state.clear()
-    await message.answer("Альбомы обновлены", reply_markup=main_reply_keyboard())
-
-@router.message(ProfileEdit.artists)
-async def edit_artists(message: Message, state: FSMContext, session: AsyncSession):
-    user = await crud.get_user_by_telegram_id(session, message.from_user.id)
-    artists = None if message.text.lower() == "пропустить" else truncate_field(message.text, 500)
-    await crud.update_user(session, user, favorite_artists=artists)
-    await state.clear()
-    await message.answer("Исполнители обновлены", reply_markup=main_reply_keyboard())
 
 @router.callback_query(StateFilter(ProfileEdit.goal), F.data.startswith("goal_"))
 async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
