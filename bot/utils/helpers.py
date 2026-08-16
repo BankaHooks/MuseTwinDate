@@ -22,7 +22,7 @@ CITY_SYNONYMS = {
     "челябинск": ["челябинск", "chel"],
     "самара": ["самара", "samara"],
     "омск": ["омск", "omsk"],
-    "ростов-на-дону": ["ростов", "ростов-на-дону", "rostov"],
+    "ростов-на-дону": ["ростов", "ростов-на-дону", "rostov", "РнД"],
     "уфа": ["уфа", "ufa"],
     "красноярск": ["красноярск", "krasnoyarsk"],
     "пермь": ["пермь", "perm"],
@@ -97,10 +97,6 @@ def format_user_card(user, match_score=None):
         text += f"Группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Песни: {user.favorite_songs}\n"
-    if user.favorite_albums:
-        text += f"Альбомы: {user.favorite_albums}\n"
-    if user.favorite_artists:
-        text += f"Исполнители: {user.favorite_artists}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
@@ -132,10 +128,6 @@ def format_profile(user):
         text += f"Любимые группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Любимые песни: {user.favorite_songs}\n"
-    if user.favorite_albums:
-        text += f"Любимые альбомы: {user.favorite_albums}\n"
-    if user.favorite_artists:
-        text += f"Любимые исполнители: {user.favorite_artists}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
