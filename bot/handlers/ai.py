@@ -478,25 +478,21 @@ async def find_gaming_buddy(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("gaming_cat_"))
 async def gaming_category_chosen(callback: CallbackQuery):
-    # Убираем префикс "gaming_cat_"
     category = callback.data[len("gaming_cat_"):]
-    # Восстанавливаем пробелы из подчёркиваний (только для пробелов)
     category = category.replace('_', ' ').strip()
     await edit_or_caption(callback, f"Выберите игру в категории «{category}»:", reply_markup=gaming_games_keyboard(category))
     await callback.answer()
 
 @router.callback_query(F.data.startswith("gaming_game_"))
 async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
-    # Убираем префикс "gaming_game_"
     game = callback.data[len("gaming_game_"):]
-    # Восстанавливаем пробелы из подчёркиваний (только для пробелов)
     game = game.replace('_', ' ').strip()
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
         await callback.answer("Ошибка")
         return
 
-    players = await crud.get_users_by_game(session, game, user.id, limit=10)
+    players = await crud.get_users_by_game(session, game.lower().strip(), user.id, limit=10)
     if not players:
         await edit_or_caption(callback,
             f"🎮 По игре «{game}» никого не найдено.\nПопробуйте другую игру.",

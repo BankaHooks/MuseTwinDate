@@ -113,7 +113,7 @@ def format_user_card(user, match_score=None):
     if user.bio:
         text += f"{user.bio}\n"
     if match_score and match_score > 0:
-        text += f"Совпадение вкуса: {round(match_score * 100)}%\n"
+        text += f"Совпадение вкуса: {match_score}%\n"
     return text
 
 def format_profile(user):
