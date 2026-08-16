@@ -12,6 +12,7 @@ class ProfileEditState(StatesGroup):
     artists = State()
     goal = State()
     interests = State()
+    games = State()
     preferred_gender = State()
     bio = State()
     photo = State()

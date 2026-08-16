@@ -10,7 +10,8 @@ from database.models import User
 from keyboards.inline import (
     profile_main_keyboard, profile_edit_keyboard, gender_choose_keyboard,
     genre_choose_keyboard, goal_keyboard, interest_category_keyboard,
-    interest_items_keyboard, preferred_gender_keyboard, profile_search_settings_keyboard
+    interest_items_keyboard, games_category_keyboard, games_items_keyboard,
+    preferred_gender_keyboard, profile_search_settings_keyboard
 )
 from keyboards.reply import main_reply_keyboard
 from states.profile_edit import ProfileEditState
@@ -70,13 +71,14 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
     field = callback.data.split("_")[1]
     field_map = {
         "name": ("Введите новое имя:", ProfileEditState.name),
-        "age": ("Введите новый возраст (18-99):", ProfileEditState.age),
+        "age": ("Введите новый возраст (16-99):", ProfileEditState.age),
         "city": ("Введите новый город:", ProfileEditState.city),
         "genres": ("Выберите новые жанры:", ProfileEditState.genres),
         "bands": ("Введите новые группы (до 5, через запятую):", ProfileEditState.bands),
         "songs": ("Введите новые песни (до 500 символов):", ProfileEditState.songs),
         "goal": ("Выберите новую цель:", ProfileEditState.goal),
         "interests": ("Выберите новые интересы:", ProfileEditState.interests),
+        "games": ("Выберите новые игры:", ProfileEditState.games),
         "bio": ("Введите новое био (до 500 символов):", ProfileEditState.bio),
         "photo": ("Отправьте новое фото:", ProfileEditState.photo),
     }
@@ -92,6 +94,8 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
         await edit_or_caption(callback, prompt, reply_markup=goal_keyboard())
     elif field == "interests":
         await edit_or_caption(callback, "Выберите категорию интересов:", reply_markup=interest_category_keyboard())
+    elif field == "games":
+        await edit_or_caption(callback, "Выберите категорию игр:", reply_markup=games_category_keyboard())
     elif field == "photo":
         await edit_or_caption(callback, "Отправьте фото (или нажмите «Пропустить»):",
                               reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -121,7 +125,7 @@ async def edit_age(message: Message, state: FSMContext, session: AsyncSession):
         return
     age = int(message.text)
     if not validate_age(age):
-        await message.answer("Возраст должен быть от 18 до 99 лет.")
+        await message.answer("Возраст должен быть от 16 до 99 лет.")
         return
     await state.update_data(age=age)
     await finish_edit(message, state, session)
@@ -238,6 +242,58 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
     await state.update_data(interests=", ".join(selected))
     await finish_edit(callback, state, session)
 
+@router.callback_query(F.data.startswith("gamecat_"), StateFilter(ProfileEditState.games))
+async def edit_games_category(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_")[1]
+    category = category.replace("_", " ").strip()
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    await state.update_data(current_game_category=category)
+    markup = games_items_keyboard(category, selected)
+    await edit_or_caption(callback, f"Выберите игры в категории «{category}»:", reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("game_"), StateFilter(ProfileEditState.games))
+async def edit_game_item(callback: CallbackQuery, state: FSMContext):
+    game = callback.data.split("_")[1]
+    game = game.replace("_", " ")
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    if game in selected:
+        selected.remove(game)
+        await callback.answer(f"Удалено: {game}")
+    else:
+        if len(selected) >= 10:
+            await callback.answer("Максимум 10 игр.", show_alert=True)
+            return
+        selected.append(game)
+        await callback.answer(f"Добавлено: {game}")
+    await state.update_data(selected_games=selected)
+    category = data.get("current_game_category", "")
+    if category:
+        markup = games_items_keyboard(category, selected)
+        await callback.message.edit_reply_markup(reply_markup=markup)
+
+@router.callback_query(F.data == "games_back", StateFilter(ProfileEditState.games))
+async def edit_games_back(callback: CallbackQuery, state: FSMContext):
+    await edit_or_caption(callback, "Выберите категории игр:", reply_markup=games_category_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "games_none", StateFilter(ProfileEditState.games))
+async def edit_games_none(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await state.update_data(games="Не играю")
+    await finish_edit(callback, state, session)
+
+@router.callback_query(F.data == "games_done", StateFilter(ProfileEditState.games))
+async def edit_games_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    if not selected:
+        await callback.answer("Выберите хотя бы одну игру или нажмите «Не играю».", show_alert=True)
+        return
+    await state.update_data(games=", ".join(selected))
+    await finish_edit(callback, state, session)
+
 @router.message(ProfileEditState.bio)
 async def edit_bio(message: Message, state: FSMContext, session: AsyncSession):
     bio = message.text.strip()
@@ -316,6 +372,7 @@ async def reset_profile(callback: CallbackQuery, state: FSMContext, session: Asy
         user.favorite_songs = None
         user.search_goal = None
         user.interests = None
+        user.favorite_games = None
         user.bio = None
         user.photo_file_id = None
         await session.commit()
@@ -337,7 +394,7 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
             await event.reply("Ошибка")
         return
     update_data = {}
-    for key in ["name", "age", "city", "genres", "bands", "songs", "goal", "interests", "bio", "photo_file_id"]:
+    for key in ["name", "age", "city", "genres", "bands", "songs", "goal", "interests", "games", "bio", "photo_file_id"]:
         if key in data:
             update_data[key] = data[key]
     if extra:

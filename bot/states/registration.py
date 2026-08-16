@@ -1,6 +1,6 @@
 from aiogram.fsm.state import State, StatesGroup
 
-class Registration(StatesGroup):
+class RegistrationState(StatesGroup):
     name = State()
     gender = State()
     age = State()
@@ -12,9 +12,13 @@ class Registration(StatesGroup):
     artists = State()
     goal = State()
     interests = State()
+    games = State()
     preferred_gender = State()
     bio = State()
     photo = State()
+
+class Registration(RegistrationState):
+    pass
 
 class RegistrationState(Registration):
     pass

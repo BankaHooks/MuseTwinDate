@@ -35,7 +35,14 @@ class User(Base):
     last_like_notification_count = Column(Integer, default=0)
     last_inactivity_notification = Column(DateTime, nullable=True)
     last_reset = Column(DateTime, nullable=True)
+    last_referral_reminder = Column(DateTime, nullable=True)
+    last_promo_reminder = Column(DateTime, nullable=True)
     embedding = Column(Text, nullable=True)
+    referral_code = Column(String(50), unique=True, nullable=True)
+    referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    referral_count = Column(Integer, default=0)
+    referral_discount = Column(Integer, default=0)
+    favorite_games = Column(Text, nullable=True)
 
     sent_likes = relationship("Like", foreign_keys="Like.from_user_id", back_populates="from_user")
     received_likes = relationship("Like", foreign_keys="Like.to_user_id", back_populates="to_user")
@@ -43,13 +50,7 @@ class User(Base):
     blocks_given = relationship("Block", foreign_keys="Block.blocker_id", back_populates="blocker")
     blocks_received = relationship("Block", foreign_keys="Block.blocked_id", back_populates="blocked")
     reports_sent = relationship("Report", foreign_keys="Report.reporter_id", back_populates="reporter")
-
-    referral_code = Column(String(50), unique=True, nullable=True)
-    referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    referral_count = Column(Integer, default=0)
-    referral_discount = Column(Integer, default=0)  
-
-    last_referral_reminder = Column(DateTime, nullable=True)
+    referrer = relationship("User", remote_side=[id], foreign_keys=[referred_by])
 
 class Like(Base):
     __tablename__ = "likes"

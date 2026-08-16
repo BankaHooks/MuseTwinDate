@@ -5,7 +5,11 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import User
-from keyboards.inline import welcome_keyboard, main_menu_keyboard, gender_choose_keyboard, genre_choose_keyboard, goal_keyboard, interest_category_keyboard, interest_items_keyboard
+from keyboards.inline import (
+    welcome_keyboard, main_menu_keyboard, gender_choose_keyboard,
+    genre_choose_keyboard, goal_keyboard, interest_category_keyboard,
+    interest_items_keyboard, games_category_keyboard, games_items_keyboard
+)
 from keyboards.reply import main_reply_keyboard
 from states.registration import RegistrationState
 from states.profile_edit import ProfileEditState
@@ -196,6 +200,64 @@ async def process_interests_done(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Выберите хотя бы один интерес!", show_alert=True)
         return
     await state.update_data(interests=", ".join(selected))
+    await state.set_state(RegistrationState.games)
+    await callback.message.delete()
+    await callback.message.answer("Теперь выберите игры, в которые вы играете (можно несколько):", reply_markup=games_category_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("gamecat_"), RegistrationState.games)
+async def process_games_category(callback: CallbackQuery, state: FSMContext):
+    category = callback.data.split("_")[1]
+    category = category.replace("_", " ").strip()
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    await state.update_data(current_game_category=category)
+    markup = games_items_keyboard(category, selected)
+    await callback.message.edit_text(f"Выберите игры в категории «{category}»:", reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("game_"), RegistrationState.games)
+async def process_game_item(callback: CallbackQuery, state: FSMContext):
+    game = callback.data.split("_")[1]
+    game = game.replace("_", " ")
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    if game in selected:
+        selected.remove(game)
+        await callback.answer(f"Удалено: {game}")
+    else:
+        if len(selected) >= 10:
+            await callback.answer("Максимум 10 игр.", show_alert=True)
+            return
+        selected.append(game)
+        await callback.answer(f"Добавлено: {game}")
+    await state.update_data(selected_games=selected)
+    category = data.get("current_game_category", "")
+    if category:
+        markup = games_items_keyboard(category, selected)
+        await callback.message.edit_reply_markup(reply_markup=markup)
+
+@router.callback_query(F.data == "games_back", RegistrationState.games)
+async def games_back(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Выберите категории игр:", reply_markup=games_category_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data == "games_none", RegistrationState.games)
+async def games_none(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(games="Не играю")
+    await state.set_state(RegistrationState.bio)
+    await callback.message.delete()
+    await callback.message.answer("Напишите немного о себе (био, до 500 символов):")
+    await callback.answer()
+
+@router.callback_query(F.data == "games_done", RegistrationState.games)
+async def process_games_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    selected = data.get("selected_games", [])
+    if not selected:
+        await callback.answer("Выберите хотя бы одну игру или нажмите «Не играю».", show_alert=True)
+        return
+    await state.update_data(games=", ".join(selected))
     await state.set_state(RegistrationState.bio)
     await callback.message.delete()
     await callback.message.answer("Напишите немного о себе (био, до 500 символов):")
@@ -245,6 +307,7 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
         favorite_songs=data.get("songs"),
         search_goal=data.get("goal"),
         interests=data.get("interests"),
+        favorite_games=data.get("games"),
         bio=data.get("bio"),
         photo_file_id=data.get("photo_file_id")
     )

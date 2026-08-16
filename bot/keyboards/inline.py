@@ -50,6 +50,36 @@ INTEREST_CATEGORIES = {
     ]
 }
 
+GAMES_CATEGORIES = {
+    "Кооперативные": [
+        "R.E.P.O.", "Helldivers 2", "It Takes Two", "Split Fiction", "Risk of Rain 2",
+        "Deep Rock Galactic", "Payday 3", "GTFO", "Barotrauma", "Ready or Not"
+    ],
+    "Шутеры": [
+        "Counter-Strike 2", "VALORANT", "Apex Legends", "Fortnite", "Call of Duty: Black Ops 6",
+        "Rainbow Six: Siege X", "Marathon", "DOOM: The Dark Ages", "Pragmata", "THE FINALS",
+        "PUBG", "Overwatch 2", "Destiny 2", "Warframe", "Escape from Tarkov", "Hunt: Showdown"
+    ],
+    "Выживания": [
+        "Subnautica 2", "ARK: Survival Ascended", "Minecraft", "Don't Starve Together", "Rust",
+        "DayZ", "The Forest", "Sons of the Forest", "Grounded", "Valheim", "Project Zomboid", "7 Days to Die"
+    ],
+    "Стратегии": [
+        "Warhammer 40,000: Dawn of War IV", "Heroes of Might and Magic: Olden Era",
+        "Civilization VII", "Total War: Warhammer 3", "Age of Empires IV", "Iron Harvest",
+        "Company of Heroes 3", "Northgard", "Dune: Spice Wars", "Menace"
+    ],
+    "MOBA / Геройские": [
+        "Dota 2", "League of Legends", "Mobile Legends: Bang Bang", "Marvel Rivals", "Smite 2"
+    ],
+    "MMORPG / RPG": [
+        "World of Warcraft", "Final Fantasy XIV", "Genshin Impact", "Path of Exile 2",
+        "Diablo IV: Lord of Hatred", "The Blood of Dawnwalker", "Kingdom Come: Deliverance 2",
+        "Baldur's Gate 3", "Clair Obscur: Expedition 33", "Elden Ring Nightreign",
+        "Cyberpunk 2077", "Resident Evil Requiem", "Silent Hill f", "Death Stranding 2: On the Beach"
+    ]
+}
+
 def _clean(text):
     cleaned = re.sub(r'[^a-zA-Zа-яА-Я0-9\s]', '', text)
     return cleaned.replace(' ', '_')
@@ -93,8 +123,9 @@ def profile_edit_keyboard():
         [InlineKeyboardButton(text="Песни", callback_data="edit_songs"),
          InlineKeyboardButton(text="Цель", callback_data="edit_goal")],
         [InlineKeyboardButton(text="Интересы", callback_data="edit_interests"),
-         InlineKeyboardButton(text="Био", callback_data="edit_bio")],
-        [InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
+         InlineKeyboardButton(text="Игры", callback_data="edit_games")],
+        [InlineKeyboardButton(text="Био", callback_data="edit_bio"),
+         InlineKeyboardButton(text="Фото", callback_data="edit_photo")],
         [InlineKeyboardButton(text="Обновить рекомендации", callback_data="refresh_recommendations")],
         [InlineKeyboardButton(text="Перезаполнить анкету заново", callback_data="reset_profile")],
         [InlineKeyboardButton(text="Назад", callback_data="profile_back")]
@@ -145,7 +176,7 @@ def interest_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def interest_items_keyboard(category, selected):
-    category = category.strip()  # Убираем лишние пробелы
+    category = category.strip()
     topics = INTEREST_CATEGORIES.get(category, [])
     buttons = []
     for topic in topics:
@@ -153,6 +184,25 @@ def interest_items_keyboard(category, selected):
         clean_topic = _clean(topic)
         buttons.append([InlineKeyboardButton(text=f"{check}{topic}", callback_data=f"interest_{clean_topic}")])
     buttons.append([InlineKeyboardButton(text="Назад к категориям", callback_data="interests_back")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def games_category_keyboard():
+    buttons = []
+    for category in GAMES_CATEGORIES.keys():
+        buttons.append([InlineKeyboardButton(text=category, callback_data=f"gamecat_{_clean(category)}")])
+    buttons.append([InlineKeyboardButton(text="Не играю", callback_data="games_none")])
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="games_done")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def games_items_keyboard(category, selected):
+    category = category.strip()
+    games = GAMES_CATEGORIES.get(category, [])
+    buttons = []
+    for game in games:
+        check = "✅ " if game in selected else ""
+        clean_game = _clean(game)
+        buttons.append([InlineKeyboardButton(text=f"{check}{game}", callback_data=f"game_{clean_game}")])
+    buttons.append([InlineKeyboardButton(text="Назад к категориям", callback_data="games_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def browse_actions_keyboard():

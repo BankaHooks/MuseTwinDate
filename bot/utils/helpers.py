@@ -100,6 +100,8 @@ def format_user_card(user, match_score=None):
         text += f"Группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Песни: {user.favorite_songs}\n"
+    if user.favorite_games:
+        text += f"Игры: {user.favorite_games}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
@@ -131,6 +133,8 @@ def format_profile(user):
         text += f"Любимые группы: {user.favorite_bands}\n"
     if user.favorite_songs:
         text += f"Любимые песни: {user.favorite_songs}\n"
+    if user.favorite_games:
+        text += f"Игры: {user.favorite_games}\n"
     text += "---\n"
     if user.search_goal:
         goal_ru = GOAL_TRANSLATE.get(user.search_goal, user.search_goal)
