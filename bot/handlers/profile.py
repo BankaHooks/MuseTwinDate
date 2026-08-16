@@ -21,6 +21,13 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
+async def edit_or_caption(callback: CallbackQuery, text: str, reply_markup=None, parse_mode=None):
+    """Универсальная функция для редактирования текста или подписи"""
+    if callback.message.photo:
+        await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    else:
+        await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+
 @router.callback_query(F.data == "profile")
 async def show_profile(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -56,7 +63,7 @@ async def profile_back(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data == "profile_edit_menu")
 async def profile_edit_menu(callback: CallbackQuery):
-    await callback.message.edit_text("Выберите поле для редактирования:", reply_markup=profile_edit_keyboard())
+    await edit_or_caption(callback, "Выберите поле для редактирования:", reply_markup=profile_edit_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data.startswith("edit_"))
@@ -81,18 +88,18 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
     await state.set_state(state_name)
     await state.update_data(edit_field=field)
     if field == "genres":
-        await callback.message.edit_text(prompt, reply_markup=genre_choose_keyboard())
+        await edit_or_caption(callback, prompt, reply_markup=genre_choose_keyboard())
     elif field == "goal":
-        await callback.message.edit_text(prompt, reply_markup=goal_keyboard())
+        await edit_or_caption(callback, prompt, reply_markup=goal_keyboard())
     elif field == "interests":
-        await callback.message.edit_text("Выберите категорию интересов:", reply_markup=interest_category_keyboard())
+        await edit_or_caption(callback, "Выберите категорию интересов:", reply_markup=interest_category_keyboard())
     elif field == "photo":
-        await callback.message.edit_text("Отправьте фото (или нажмите «Пропустить»):",
-                                         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                             [InlineKeyboardButton(text="Пропустить", callback_data="skip_photo_edit")]
-                                         ]))
+        await edit_or_caption(callback, "Отправьте фото (или нажмите «Пропустить»):",
+                              reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                  [InlineKeyboardButton(text="Пропустить", callback_data="skip_photo_edit")]
+                              ]))
     else:
-        await callback.message.edit_text(prompt)
+        await edit_or_caption(callback, prompt)
     await callback.answer()
 
 @router.callback_query(F.data == "skip_photo_edit", StateFilter(ProfileEditState.photo))
@@ -193,7 +200,7 @@ async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
     selected = data.get("selected_interests", [])
     await state.update_data(current_category=category)
     markup = interest_items_keyboard(category, selected)
-    await callback.message.edit_text(f"Выберите интересы в категории «{category}»:", reply_markup=markup)
+    await edit_or_caption(callback, f"Выберите интересы в категории «{category}»:", reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data.startswith("interest_"), StateFilter(ProfileEditState.interests))
@@ -219,7 +226,7 @@ async def edit_interest_item(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "interests_back", StateFilter(ProfileEditState.interests))
 async def edit_interests_back(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("Выберите категории интересов:", reply_markup=interest_category_keyboard())
+    await edit_or_caption(callback, "Выберите категории интересов:", reply_markup=interest_category_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "interests_done", StateFilter(ProfileEditState.interests))
@@ -257,13 +264,13 @@ async def profile_search_settings(callback: CallbackQuery, session: AsyncSession
         await callback.answer("Зарегистрируйтесь через /start")
         return
     markup = profile_search_settings_keyboard(user)
-    await callback.message.edit_text("Настройки поиска:", reply_markup=markup)
+    await edit_or_caption(callback, "Настройки поиска:", reply_markup=markup)
     await callback.answer()
 
 @router.callback_query(F.data == "edit_preferred_gender")
 async def edit_preferred_gender(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ProfileEditState.preferred_gender)
-    await callback.message.edit_text("Выберите предпочитаемый пол партнёра:", reply_markup=preferred_gender_keyboard())
+    await edit_or_caption(callback, "Выберите предпочитаемый пол партнёра:", reply_markup=preferred_gender_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
