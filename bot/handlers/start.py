@@ -154,10 +154,10 @@ async def process_goal(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("cat_"), RegistrationState.interests)
 async def process_interest_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data.split("_")[1]
-    category = category.replace("_", " ")
+    category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_interests", [])
-    # Показываем список тем внутри категории
+    await state.update_data(current_category=category)
     markup = interest_items_keyboard(category, selected)
     await callback.message.edit_text(f"Выберите интересы в категории «{category}»:", reply_markup=markup)
     await callback.answer()
@@ -178,7 +178,6 @@ async def process_interest_item(callback: CallbackQuery, state: FSMContext):
         selected.append(item)
         await callback.answer(f"Добавлено: {item}")
     await state.update_data(selected_interests=selected)
-    # Обновляем клавиатуру – вернуться на категории
     category = data.get("current_category", "")
     if category:
         markup = interest_items_keyboard(category, selected)
@@ -253,7 +252,6 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
     await session.commit()
     await session.refresh(user)
 
-    # Обработка реферальной ссылки
     if ref_code:
         referrer = await crud.get_user_by_referral_code(session, ref_code)
         if referrer and referrer.id != user.id:
@@ -269,7 +267,6 @@ async def finish_registration(message: Message, state: FSMContext, session: Asyn
             except:
                 pass
 
-    # Генерация реферального кода для нового пользователя
     if not user.referral_code:
         user.referral_code = await crud.generate_referral_code(session, user.telegram_id)
         await session.commit()

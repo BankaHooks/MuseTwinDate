@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 async def edit_or_caption(callback: CallbackQuery, text: str, reply_markup=None, parse_mode=None):
-    """Универсальная функция для редактирования текста или подписи"""
     if callback.message.photo:
         await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
     else:
@@ -195,7 +194,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
 @router.callback_query(F.data.startswith("cat_"), StateFilter(ProfileEditState.interests))
 async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data.split("_")[1]
-    category = category.replace("_", " ")
+    category = category.replace("_", " ").strip()
     data = await state.get_data()
     selected = data.get("selected_interests", [])
     await state.update_data(current_category=category)

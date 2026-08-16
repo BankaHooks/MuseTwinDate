@@ -145,6 +145,7 @@ def interest_category_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def interest_items_keyboard(category, selected):
+    category = category.strip()  # Убираем лишние пробелы
     topics = INTEREST_CATEGORIES.get(category, [])
     buttons = []
     for topic in topics:
