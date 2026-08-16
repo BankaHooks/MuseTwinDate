@@ -62,8 +62,10 @@ HOBBIES = [
 
 GOALS = ["flirt", "communication", "friendship", "relationship"]
 GOAL_RU = {
-    "flirt": "флирта", "communication": "общения",
-    "friendship": "дружбы", "relationship": "отношений"
+    "flirt": "флирта",
+    "communication": "общения",
+    "friendship": "дружбы",
+    "relationship": "отношений"
 }
 
 EMOJIS = ["💕", "✨", "🍀", "🩷", "💌", "🌸", "❤️", "🫶", "🌟", "🎵", "🎶", "😊", "✌️", "👋", "☀️", "🌺", "🦋", "🐱", "🌙", "⭐"]
@@ -80,6 +82,7 @@ BIO_TEMPLATES = [
     "Здесь {name}, {age}. Люблю {hobby1} и {hobby2}. В музыке предпочитаю {music}. Ищу общение и дружбу. {emoji}",
     "{name}, {age}, {city}. Интересуюсь {interests}. В музыке — {music}. Буду рада новым знакомствам! {emoji}",
     "{name}, {age}, {city}. Обожаю {hobby1}, слушаю {music}. Ищу {goal_ru}. Пиши, не стесняйся! {emoji}",
+    "",
     "",
     "{name}, {age}, {city}. Просто хочу пообщаться. 🫶",
     "{name}, {age}, {city}. {hobby1} – моё всё. Ищу компанию для прогулок и разговоров. {emoji}",
@@ -123,7 +126,6 @@ async def seed_users():
     engine = create_async_engine(config.DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         bots = await session.execute(select(User.id).where(User.telegram_id < 0))
@@ -137,21 +139,14 @@ async def seed_users():
             await session.execute(delete(Payment).where(Payment.user_id.in_(bot_ids)))
             await session.execute(delete(User).where(User.id.in_(bot_ids)))
             await session.commit()
-
         total = 80
-        # Используем pravatar.cc – гарантированно отдаёт фото людей
-        photo_urls = []
-        for i in range(1, 200):
-            photo_urls.append(f"https://i.pravatar.cc/300?img={i}")
-        random.shuffle(photo_urls)
-
         all_topics = []
         for topics in INTEREST_CATEGORIES.values():
             all_topics.extend(topics)
-
         for i in range(total):
             gender = random.choice(["Мужской", "Женский"])
-            photo_url = photo_urls[i % len(photo_urls)]
+            photo_id = random.randint(1, 100)
+            photo_url = f"https://i.pravatar.cc/300?img={photo_id}"
             name = random.choice(NAMES)
             age = random.randint(18, 45)
             city = random.choice(CITIES)
@@ -160,7 +155,6 @@ async def seed_users():
             song = random.choice(SONGS)
             pref_gender = random.choice(["Мужской", "Женский", "Любой"])
             goal = random.choice(GOALS)
-
             num_interests = random.randint(3, 5)
             selected_interests = []
             while len(selected_interests) < num_interests:
@@ -168,16 +162,13 @@ async def seed_users():
                 if topic not in selected_interests:
                     selected_interests.append(topic)
             interests_str = ", ".join(selected_interests)
-
             if random.random() < 0.5:
                 music_text = f"{band} и {song}"
             else:
                 music_text = genre
-
             bio = generate_bio(name, age, city, music_text, interests_str, goal)
             if not bio:
                 bio = f"{name}, {age}, {city}." + (" Ищу общение!" if random.random() < 0.5 else "")
-
             user = User(
                 telegram_id = -i - 1,
                 username = f"user_{i}",
@@ -200,7 +191,7 @@ async def seed_users():
             if (i + 1) % 10 == 0:
                 print(f"Создано {i+1} из {total} пользователей...")
         await session.commit()
-    print(f"Готово! Создано {total} реалистичных анкет с фото от pravatar.cc.")
+    print(f"Готово! Создано {total} реалистичных анкет с рабочими фото.")
 
 if __name__ == "__main__":
     asyncio.run(seed_users())
