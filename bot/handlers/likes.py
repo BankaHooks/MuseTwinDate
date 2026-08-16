@@ -9,7 +9,9 @@ from keyboards.inline import likes_action_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import format_user_card
 from utils.security import escape_markdown
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 class LikesState(StatesGroup):
@@ -86,12 +88,11 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
     if not target:
         await callback.answer("Пользователь не найден.")
         return
-    existing = await crud.create_like(session, user.id, target.id)
-    if existing and existing.is_mutual:
-        await callback.answer("Уже взаимно!")
-        await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
-        return
+
+    # Создаём лайк (проверка дубликатов внутри)
     like = await crud.create_like(session, user.id, target.id)
+
+    # Уведомление о количестве лайков для цели (если изменилось)
     total_likes = await get_likes_count(session, target.id)
     if total_likes > target.last_like_notification_count:
         count = total_likes
@@ -106,47 +107,45 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
             await callback.bot.send_message(target.telegram_id, text)
             target.last_like_notification_count = count
             await session.commit()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to send like count notification: {e}")
+
+    # Проверка взаимности и отправка уведомлений
     if like.is_mutual:
-        safe_user_name = escape_markdown(user.name or user.username)
-        safe_target_name = escape_markdown(target.name or target.username)
+        safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
+        safe_target_name = escape_markdown(target.name or target.username or "Пользователь")
+
+        # Ссылка на пользователя (username или tg://)
         user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
         target_link = f"@{target.username}" if target.username else f"[профиль](tg://user?id={target.telegram_id})"
+
+        # Отправляем уведомление цели (target) – кто её лайкнул (user)
         try:
             await callback.bot.send_message(
                 target.telegram_id,
-                f"Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\n"
+                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\n"
                 f"Напишите ему: {user_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
+            logger.info(f"Mutual like notification sent to {target.telegram_id}")
+        except Exception as e:
+            logger.error(f"Failed to send mutual like to target {target.telegram_id}: {e}")
+
+        # Отправляем уведомление пользователю (user) – кто его лайкнул (target)
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"Взаимный лайк! Вы и {safe_target_name} понравились друг другу.\n"
+                f"💞 Взаимный лайк! Вы и **{safe_target_name}** понравились друг другу.\n"
                 f"Напишите ему: {target_link}",
                 parse_mode="Markdown"
             )
-        except:
-            pass
-        await callback.answer("Это взаимно!")
+            logger.info(f"Mutual like notification sent to {user.telegram_id}")
+        except Exception as e:
+            logger.error(f"Failed to send mutual like to user {user.telegram_id}: {e}")
+
+        await callback.answer("Это взаимно! 💞")
     else:
         await callback.answer("Вы лайкнули в ответ!")
+
+    # Обновляем список лайков (удаляем обработанный)
     await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
-
-@router.callback_query(F.data.startswith("skip_like_"))
-async def skip_like_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    data = await state.get_data()
-    idx = data.get("current_index", 0)
-    await state.update_data(current_index=idx + 1)
-    await show_like_card(callback.message, state, session, edit=True)
-    await callback.answer()
-
-@router.callback_query(F.data == "likes_back")
-async def likes_back(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.delete()
-    await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
-    await callback.answer()
