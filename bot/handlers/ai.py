@@ -261,7 +261,6 @@ async def ai_like(callback: CallbackQuery, state: FSMContext, session: AsyncSess
         await crud.increment_likes(session, user)
         if like.is_mutual:
             await callback.answer("Взаимно! 💞", show_alert=True)
-            # уведомления (можно добавить)
         else:
             await callback.answer("Лайк поставлен!")
     else:
@@ -479,19 +478,24 @@ async def find_gaming_buddy(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("gaming_cat_"))
 async def gaming_category_chosen(callback: CallbackQuery):
-    category = callback.data.split("_", 1)[1].replace("_", " ").strip()
+    # Убираем префикс "gaming_cat_"
+    category = callback.data[len("gaming_cat_"):]
+    # Восстанавливаем пробелы из подчёркиваний (только для пробелов)
+    category = category.replace('_', ' ').strip()
     await edit_or_caption(callback, f"Выберите игру в категории «{category}»:", reply_markup=gaming_games_keyboard(category))
     await callback.answer()
 
 @router.callback_query(F.data.startswith("gaming_game_"))
 async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
-    game = callback.data.split("_", 1)[1].replace("_", " ")
+    # Убираем префикс "gaming_game_"
+    game = callback.data[len("gaming_game_"):]
+    # Восстанавливаем пробелы из подчёркиваний (только для пробелов)
+    game = game.replace('_', ' ').strip()
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
         await callback.answer("Ошибка")
         return
 
-    # Функция get_users_by_game должна быть в database/crud.py
     players = await crud.get_users_by_game(session, game, user.id, limit=10)
     if not players:
         await edit_or_caption(callback,

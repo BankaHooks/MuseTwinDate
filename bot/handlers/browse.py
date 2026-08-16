@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, InputMediaPhoto, Message, InlineKeyboar
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
-from database.models import Skip
+from database.models import Skip, Like
 from keyboards.inline import browse_actions_keyboard, report_reason_keyboard
 from keyboards.reply import main_reply_keyboard
 from states.browse import Browse
@@ -35,13 +35,13 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Сбросить историю и показать всех", callback_data="show_all")],
+            [InlineKeyboardButton(text="🔄 Показать все анкеты", callback_data="show_all")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
         await target_message.answer(
             "😕 Больше нет новых анкет.\n\n"
             "Вы уже просмотрели всех доступных пользователей.\n"
-            "Нажмите «Сбросить историю», чтобы увидеть тех, кого вы пропустили ранее.",
+            "Нажмите «Показать все анкеты», чтобы увидеть тех, кого вы пропустили ранее.",
             reply_markup=markup
         )
         await state.clear()
@@ -88,8 +88,12 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
+    # Удаляем все скипы
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
+    # Удаляем все лайки, отправленные этим пользователем (чтобы он мог заново оценить всех)
+    await session.execute(delete(Like).where(Like.from_user_id == user.id))
     await session.commit()
+    await state.clear()  # очищаем состояние
     await callback.message.delete()
     await show_candidate(callback, state, session)
     await callback.answer()
