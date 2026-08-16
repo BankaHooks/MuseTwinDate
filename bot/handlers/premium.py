@@ -15,21 +15,30 @@ from keyboards.inline import (
 
 router = Router()
 
-@router.callback_query(F.data == "premium")
-async def premium_show(callback: CallbackQuery, session: AsyncSession):
-    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+async def show_premium_menu(target, user_id: int, session: AsyncSession, delete_old: bool = False):
+    user = await crud.get_user_by_telegram_id(session, user_id)
     if not user:
-        await callback.answer("Зарегистрируйтесь через /start")
+        await target.answer("Зарегистрируйтесь через /start")
         return
     status = "Активен" if user.is_premium else "Неактивен"
     expiry = f" (до {user.premium_expiry.strftime('%Y-%m-%d')})" if user.premium_expiry else ""
     text = f"⭐ Премиум: {status}{expiry}\n\nВыберите способ оплаты:"
-    await callback.message.edit_text(text, reply_markup=premium_payment_methods_keyboard())
+    if delete_old:
+        await target.delete()
+    await target.answer(text, reply_markup=premium_payment_methods_keyboard())
+
+@router.callback_query(F.data == "premium")
+async def premium_show(callback: CallbackQuery, session: AsyncSession):
+    await show_premium_menu(callback.message, callback.from_user.id, session, delete_old=True)
     await callback.answer()
 
+async def show_premium_for_message(message: Message, session: AsyncSession):
+    await show_premium_menu(message, message.from_user.id, session, delete_old=False)
+
 @router.callback_query(F.data == "premium_back")
-async def premium_back(callback: CallbackQuery):
-    await premium_show(callback, None)  # session не нужен для клавиатуры, но для функции нужен, передаём None
+async def premium_back(callback: CallbackQuery, session: AsyncSession):
+    await show_premium_menu(callback.message, callback.from_user.id, session, delete_old=False)
+    await callback.answer()
 
 @router.callback_query(F.data == "premium_stars")
 async def premium_stars_method(callback: CallbackQuery):
