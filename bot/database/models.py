@@ -49,6 +49,8 @@ class User(Base):
     referral_count = Column(Integer, default=0)
     referral_discount = Column(Integer, default=0)  
 
+    last_referral_reminder = Column(DateTime, nullable=True)
+
 class Like(Base):
     __tablename__ = "likes"
     id = Column(Integer, primary_key=True)

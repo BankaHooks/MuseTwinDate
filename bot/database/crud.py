@@ -279,3 +279,7 @@ async def apply_referral_discount(session: AsyncSession, user_id: int, base_pric
         discount = 90
     final_price = int(base_price * (1 - discount / 100))
     return final_price
+
+async def update_referral_reminder(session: AsyncSession, user: User):
+    user.last_referral_reminder = datetime.utcnow()
+    await session.commit()

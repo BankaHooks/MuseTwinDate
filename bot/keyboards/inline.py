@@ -78,6 +78,7 @@ def profile_main_keyboard():
     buttons = [
         [InlineKeyboardButton(text="Редактировать профиль", callback_data="profile_edit_menu")],
         [InlineKeyboardButton(text="Параметры поиска", callback_data="profile_search_settings")],
+        [InlineKeyboardButton(text="🔗 Пригласить друзей", callback_data="show_referral")],
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)

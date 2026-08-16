@@ -1,1 +1,1 @@
-from . import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope
+from . import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope, referral

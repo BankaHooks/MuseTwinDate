@@ -13,7 +13,7 @@ from config import config
 from database.db import engine, Base, AsyncSessionLocal
 from database import crud
 from database.models import User
-from handlers import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope
+from handlers import start, menu, browse, likes, profile, premium, report, admin, ai, horoscope, referral
 
 logging.basicConfig(level=getattr(logging, config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
@@ -103,6 +103,39 @@ async def fake_activity_simulator():
         except Exception as e:
             logger.error(f"Error in fake_activity_simulator: {e}")
 
+async def referral_reminder_sender():
+    while True:
+        await asyncio.sleep(86400)
+        try:
+            async with AsyncSessionLocal() as session:
+                cutoff = datetime.utcnow() - timedelta(days=7)
+                stmt = select(User).where(
+                    User.is_banned == False,
+                    (User.last_referral_reminder < cutoff) | (User.last_referral_reminder == None)
+                )
+                result = await session.execute(stmt)
+                users = result.scalars().all()
+                for user in users:
+                    try:
+                        if not user.referral_code:
+                            user.referral_code = await crud.generate_referral_code(user.telegram_id)
+                            await session.commit()
+                        link = f"t.me/MuseTwin_bot?start={user.referral_code}"
+                        await bot.send_message(
+                            user.telegram_id,
+                            f"🔗 Пригласите друзей в MuseTwin и получите скидку до 90% на премиум!\n\n"
+                            f"Ваша ссылка: `{link}`\n\n"
+                            f"Уже приглашено: {user.referral_count} человек\n"
+                            f"Ваша скидка: {user.referral_discount}%\n\n"
+                            "Чем больше друзей, тем выше скидка!",
+                            parse_mode="Markdown"
+                        )
+                        await crud.update_referral_reminder(session, user)
+                    except Exception as e:
+                        logger.error(f"Referral reminder failed for {user.telegram_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error in referral_reminder_sender: {e}")
+
 async def main():
     global bot
     storage = MemoryStorage()
@@ -130,10 +163,12 @@ async def main():
         admin.router,
         ai.router,
         horoscope.router,
+        referral.router,
     )
     await on_startup()
     asyncio.create_task(inactivity_notifier())
     asyncio.create_task(fake_activity_simulator())
+    asyncio.create_task(referral_reminder_sender())
     if config.USE_WEBHOOK:
         logger.warning("Webhook mode enabled but no webhook server implemented. Falling back to polling.")
     else:
