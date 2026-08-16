@@ -289,3 +289,25 @@ async def apply_referral_discount(session: AsyncSession, user_id: int, base_pric
 async def update_referral_reminder(session: AsyncSession, user: User):
     user.last_referral_reminder = datetime.utcnow()
     await session.commit()
+
+from utils.helpers import parse_comma_separated
+
+async def get_users_by_game(session: AsyncSession, game: str, exclude_user_id: int, limit: int = 10) -> List[User]:
+    stmt = select(User).where(
+        User.id != exclude_user_id,
+        User.is_banned == False,
+        User.is_hidden == False,
+        User.favorite_games.isnot(None),
+        User.favorite_games != ""
+    ).limit(limit * 3)
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+    filtered = []
+    for u in users:
+        if u.favorite_games:
+            games_set = parse_comma_separated(u.favorite_games)
+            if game in games_set:
+                filtered.append(u)
+                if len(filtered) >= limit:
+                    break
+    return filtered

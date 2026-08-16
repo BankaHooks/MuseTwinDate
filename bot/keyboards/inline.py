@@ -266,7 +266,25 @@ def premium_features_keyboard():
         [InlineKeyboardButton(text="AI-подбор пары", callback_data="ai_match")],
         [InlineKeyboardButton(text="Мой музыкальный профиль", callback_data="ai_music_profile")],
         [InlineKeyboardButton(text="Свидание вслепую", callback_data="blind_date")],
+        [InlineKeyboardButton(text="🎮 Найти союзника в игру", callback_data="find_gaming_buddy")],
         [InlineKeyboardButton(text="Сбросить историю", callback_data="reset_history")],
         [InlineKeyboardButton(text="Назад", callback_data="main_menu")]
     ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def gaming_categories_keyboard():
+    buttons = []
+    for category in GAMES_CATEGORIES.keys():
+        buttons.append([InlineKeyboardButton(text=category, callback_data=f"gaming_cat_{_clean(category)}")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="premium_back")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def gaming_games_keyboard(category):
+    category = category.strip()
+    games = GAMES_CATEGORIES.get(category, [])
+    buttons = []
+    for game in games:
+        clean_game = _clean(game)
+        buttons.append([InlineKeyboardButton(text=game, callback_data=f"gaming_game_{clean_game}")])
+    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="gaming_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

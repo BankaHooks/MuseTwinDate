@@ -391,6 +391,28 @@ async def reset_profile(callback: CallbackQuery, state: FSMContext, session: Asy
 async def refresh_recommendations(callback: CallbackQuery, session: AsyncSession):
     await callback.answer("Рекомендации обновлены!")
 
+@router.callback_query(F.data.startswith("view_user_"))
+async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
+    user_id = int(callback.data.split("_")[2])
+    user = await crud.get_user_by_id(session, user_id)
+    if not user:
+        await callback.answer("Пользователь не найден.")
+        return
+    from utils.helpers import format_user_card
+    from aiogram.types import InputMediaPhoto
+    text = format_user_card(user)
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="gaming_back")]
+    ])
+    if user.photo_file_id:
+        await callback.message.edit_media(
+            InputMediaPhoto(media=user.photo_file_id, caption=text),
+            reply_markup=markup
+        )
+    else:
+        await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
 async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, **extra):
     data = await state.get_data()
     user = await crud.get_user_by_telegram_id(session, event.from_user.id)

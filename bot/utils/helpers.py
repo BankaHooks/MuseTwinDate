@@ -153,3 +153,8 @@ async def send_security_notice_if_needed(message, user, session):
         await message.answer(tip)
         user.last_security_notice = datetime.utcnow()
         await session.commit()
+
+def parse_comma_separated(text: str) -> set:
+    if not text:
+        return set()
+    return {item.strip().lower() for item in text.split(',') if item.strip()}

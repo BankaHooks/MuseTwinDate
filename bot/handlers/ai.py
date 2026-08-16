@@ -1,20 +1,23 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
+from sqlalchemy import delete, or_, and_
 from datetime import datetime, timedelta
 import random
 import asyncio
 from database import crud
 from database.models import Skip, Like, BlindDate
-from utils.ai import generate_icebreakers, analyze_music_taste, get_match_recommendation, generate_blind_date_questions
-from keyboards.inline import premium_features_keyboard, browse_actions_keyboard
+from utils.ai import analyze_music_taste, generate_blind_date_questions
+from utils.matching import get_candidates_sorted, calculate_match_score
+from keyboards.inline import premium_features_keyboard, browse_actions_keyboard, gaming_categories_keyboard, gaming_games_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.security import escape_markdown
 from states.browse import Browse
 from config import config
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 POPULAR_SONGS = [
@@ -162,27 +165,6 @@ POPULAR_SONGS = [
     ("Queen", "Fat Bottomed Girls")
 ]
 
-async def cancel_blind_date_after_timeout(blind_date_id: int, bot, session_maker):
-    await asyncio.sleep(600)
-    async with session_maker() as session:
-        blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
-        if not blind_date:
-            return
-        if blind_date.user1_listened and blind_date.user2_listened:
-            return
-        user1 = await crud.get_user_by_id(session, blind_date.user1_id)
-        user2 = await crud.get_user_by_id(session, blind_date.user2_id)
-        await session.delete(blind_date)
-        await session.commit()
-        try:
-            await bot.send_message(user1.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 минут). Попробуйте снова позже.")
-        except:
-            pass
-        try:
-            await bot.send_message(user2.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 минут). Попробуйте снова позже.")
-        except:
-            pass
-
 @router.callback_query(F.data == "show_premium_features")
 async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -201,34 +183,155 @@ async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSes
     if not user or not user.is_premium:
         await callback.answer("Только для премиум!", show_alert=True)
         return
-    if not config.GIGACHAT_API_KEY:
-        await callback.message.edit_text("AI-функции недоступны: отсутствует API-ключ GigaChat.")
+
+    # Получаем топ-5 кандидатов
+    scored_candidates = await get_candidates_sorted(session, user, limit=5)
+    if not scored_candidates:
+        await callback.message.edit_text("Нет подходящих кандидатов для AI-подбора.")
         return
-    await callback.message.edit_text("Ищу идеальную пару с помощью AI...")
-    pool = await crud.get_candidate_pool(session, user.id)
-    if not pool:
-        await callback.message.edit_text("Нет кандидатов для подбора.")
+
+    # Сохраняем список в состоянии
+    candidates_data = []
+    for candidate, score in scored_candidates:
+        candidates_data.append({
+            "id": candidate.id,
+            "score": round(score * 100)
+        })
+    await state.update_data(ai_candidates=candidates_data, ai_index=0)
+
+    # Показываем первого кандидата
+    await show_ai_candidate(callback.message, state, session, edit=False)
+    await callback.answer()
+
+async def show_ai_candidate(target, state: FSMContext, session: AsyncSession, edit: bool = False):
+    data = await state.get_data()
+    candidates = data.get("ai_candidates", [])
+    index = data.get("ai_index", 0)
+    if not candidates or index >= len(candidates):
+        # Конец списка
+        text = "Вы просмотрели всех AI-рекомендованных кандидатов."
+        markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Назад к премиум-функциям", callback_data="show_premium_features")]
+        ])
+        if edit:
+            await target.edit_text(text, reply_markup=markup)
+        else:
+            await target.answer(text, reply_markup=markup)
+        await state.clear()
         return
-    try:
-        result = await get_match_recommendation(user, pool)
-    except Exception as e:
-        await callback.message.edit_text(f"Ошибка AI: {e}. Попробуйте позже.")
+
+    candidate_id = candidates[index]["id"]
+    score = candidates[index]["score"]
+    candidate = await crud.get_user_by_id(session, candidate_id)
+    if not candidate:
+        # Пропускаем невалидного
+        await state.update_data(ai_index=index + 1)
+        await show_ai_candidate(target, state, session, edit=edit)
         return
-    if result["user"]:
-        candidate = result["user"]
-        text = f"🎯 AI рекомендует:\n\nИмя: {candidate.name or 'Без имени'}\n"
-        if candidate.age:
-            text += f"Возраст: {candidate.age}\n"
-        if candidate.city:
-            text += f"Город: {candidate.city}\n"
-        text += f"\nПричина: {result['explanation']}\n\n"
-        text += "Хотите лайкнуть или пропустить?"
-        await state.set_state(Browse.candidate_id)
-        await state.update_data(candidate_id=candidate.id)
-        markup = browse_actions_keyboard()
-        await callback.message.edit_text(text, reply_markup=markup)
+
+    # Формируем карточку
+    from utils.helpers import format_user_card
+    text = format_user_card(candidate, score)
+    # Добавляем пояснение (если есть AI-ключ)
+    if config.GIGACHAT_API_KEY:
+        try:
+            from utils.ai import get_match_explanation
+            explanation = await get_match_explanation(user, candidate, score)
+            text += f"\n\n🤖 AI-пояснение: {explanation}"
+        except Exception as e:
+            logger.error(f"AI explanation error: {e}")
+
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"ai_like_{candidate_id}"),
+         InlineKeyboardButton(text="⏭️ Скип", callback_data=f"ai_skip_{candidate_id}")],
+        [InlineKeyboardButton(text="📋 Все кандидаты", callback_data="ai_list")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="show_premium_features")]
+    ])
+
+    if edit:
+        if candidate.photo_file_id:
+            await target.edit_media(
+                InputMediaPhoto(media=candidate.photo_file_id, caption=text),
+                reply_markup=markup
+            )
+        else:
+            await target.edit_text(text, reply_markup=markup)
     else:
-        await callback.message.edit_text(result["explanation"])
+        if candidate.photo_file_id:
+            await target.answer_photo(photo=candidate.photo_file_id, caption=text, reply_markup=markup)
+        else:
+            await target.answer(text, reply_markup=markup)
+
+@router.callback_query(F.data.startswith("ai_like_"))
+async def ai_like(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    candidate_id = int(callback.data.split("_")[2])
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Ошибка")
+        return
+    if not await crud.can_like(session, user):
+        await callback.answer("Лимит лайков исчерпан", show_alert=True)
+        return
+    candidate = await crud.get_user_by_id(session, candidate_id)
+    if not candidate:
+        await callback.answer("Анкета не найдена")
+        return
+    like = await crud.create_like(session, user.id, candidate.id)
+    await crud.increment_likes(session, user)
+    if like.is_mutual:
+        await callback.answer("Взаимный лайк! 💞", show_alert=True)
+        # Отправка уведомлений о взаимности
+        try:
+            user_link = f"@{user.username}" if user.username else f"[профиль](tg://user?id={user.telegram_id})"
+            candidate_link = f"@{candidate.username}" if candidate.username else f"[профиль](tg://user?id={candidate.telegram_id})"
+            await callback.bot.send_message(
+                candidate.telegram_id,
+                f"💞 Взаимный лайк! Вы и **{user.name or user.username}** понравились друг другу.\nНапишите ему: {user_link}",
+                parse_mode="Markdown"
+            )
+            await callback.bot.send_message(
+                user.telegram_id,
+                f"💞 Взаимный лайк! Вы и **{candidate.name or candidate.username}** понравились друг другу.\nНапишите ему: {candidate_link}",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Mutual like notifications error: {e}")
+    else:
+        await callback.answer("Лайк поставлен!")
+    await state.update_data(ai_index=state.get_data().get("ai_index", 0) + 1)
+    await show_ai_candidate(callback.message, state, session, edit=True)
+
+@router.callback_query(F.data.startswith("ai_skip_"))
+async def ai_skip(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    candidate_id = int(callback.data.split("_")[2])
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if user:
+        await crud.create_skip(session, user.id, candidate_id)
+    await state.update_data(ai_index=state.get_data().get("ai_index", 0) + 1)
+    await show_ai_candidate(callback.message, state, session, edit=True)
+    await callback.answer()
+
+@router.callback_query(F.data == "ai_list")
+async def ai_list(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    candidates = data.get("ai_candidates", [])
+    if not candidates:
+        await callback.answer("Нет списка")
+        return
+    text = "📋 Список AI-рекомендованных:\n\n"
+    for idx, c in enumerate(candidates):
+        user_obj = await crud.get_user_by_id(session, c["id"])
+        if user_obj:
+            text += f"{idx+1}. {user_obj.name or 'Без имени'} — {c['score']}%\n"
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 К текущему кандидату", callback_data="ai_back_to_current")]
+    ])
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+@router.callback_query(F.data == "ai_back_to_current")
+async def ai_back_to_current(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await show_ai_candidate(callback.message, state, session, edit=True)
     await callback.answer()
 
 @router.callback_query(F.data == "ai_music_profile")
@@ -245,6 +348,8 @@ async def ai_music_profile(callback: CallbackQuery, session: AsyncSession):
     await callback.message.edit_text(f"🎵 Ваш музыкальный профиль:\n\n{analysis}", reply_markup=premium_features_keyboard())
     await callback.answer()
 
+# ===================== Свидание вслепую (исправленное) =====================
+
 @router.callback_query(F.data == "blind_date")
 async def blind_date(callback: CallbackQuery, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
@@ -252,11 +357,21 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
         await callback.answer("Только для премиум!", show_alert=True)
         return
 
-    active = await crud.get_active_blind_date(session, user.id)
+    # Проверяем активное свидание (где user1 или user2, и не оба listened)
+    active = await session.execute(
+        select(BlindDate).where(
+            or_(
+                and_(BlindDate.user1_id == user.id, BlindDate.user1_listened == False),
+                and_(BlindDate.user2_id == user.id, BlindDate.user2_listened == False)
+            )
+        )
+    )
+    active = active.scalar_one_or_none()
     if active:
-        await callback.answer("У вас уже есть активное свидание вслепую! Дождитесь партнёра.", show_alert=True)
+        await callback.answer("У вас уже есть активное свидание! Дождитесь партнёра.", show_alert=True)
         return
 
+    # Ищем партнёра
     candidates = await crud.get_candidate_pool(session, user.id, limit=50)
     if not candidates:
         await callback.message.edit_text("Нет подходящих кандидатов для свидания вслепую.")
@@ -265,166 +380,156 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
 
     artist, song = random.choice(POPULAR_SONGS)
 
-    blind_date_obj = await crud.create_blind_date(session, user.id, partner.id, song, artist)
+    # Создаём запись
+    blind_date_obj = BlindDate(
+        user1_id=user.id,
+        user2_id=partner.id,
+        song=song,
+        artist=artist,
+        user1_listened=False,
+        user2_listened=False
+    )
+    session.add(blind_date_obj)
+    await session.commit()
+    await session.refresh(blind_date_obj)
 
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
-        [InlineKeyboardButton(text="❌ Отменить свидание", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
+        [InlineKeyboardButton(text="❌ Отменить", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
     ])
 
     safe_artist = escape_markdown(artist)
     safe_song = escape_markdown(song)
     text = (f"🌹 Свидание вслепую с {escape_markdown(partner.name or 'партнёром')}!\n\n"
-            f"🎵 Общий трек для прослушивания: **{safe_artist} — {safe_song}**\n\n"
-            "Прослушайте данную музыку и затем обсудите с партнёром.\n"
-            "Когда прослушаете, нажмите кнопку ниже.\n\n"
-            "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
-            "⏱️ Свидание будет автоматически отменено через 10 минут, если второй участник не прослушает трек.")
+            f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
+            "Прослушайте и нажмите кнопку.\n"
+            "⏳ Ожидаем партнёра... (автоотмена через 10 мин)")
 
-    try:
-        await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
-    except Exception:
-        await callback.message.edit_text(
-            f"🌹 Свидание вслепую с {partner.name or 'партнёром'}!\n\n"
-            f"🎵 Общий трек: {artist} — {song}\n\n"
-            "Прослушайте данную музыку и затем обсудите с партнёром.\n"
-            "Когда прослушаете, нажмите кнопку ниже.\n\n"
-            "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
-            "⏱️ Свидание будет автоматически отменено через 10 минут, если второй участник не прослушает трек.",
-            reply_markup=markup
-        )
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
     await callback.answer()
 
-    partner_text = (f"🌹 Пользователь {user.name or 'кто-то'} пригласил вас на свидание вслепую!\n\n"
-                    f"🎵 Общий трек для прослушивания: **{safe_artist} — {safe_song}**\n\n"
-                    "Прослушайте и нажмите кнопку ниже, чтобы подтвердить.\n\n"
-                    "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
-                    "⏱️ Свидание будет автоматически отменено через 10 минут, если вы не подтвердите прослушивание.")
+    # Уведомляем партнёра
+    partner_text = (f"🌹 {user.name or 'Кто-то'} пригласил вас на свидание вслепую!\n\n"
+                    f"🎵 Общий трек: **{safe_artist} — {safe_song}**\n\n"
+                    "Прослушайте и нажмите кнопку.\n"
+                    "⏳ Ожидаем партнёра... (автоотмена через 10 мин)")
     partner_markup = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Прослушал", callback_data=f"blind_date_listen_{blind_date_obj.id}")],
-        [InlineKeyboardButton(text="❌ Отменить свидание", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
+        [InlineKeyboardButton(text="❌ Отменить", callback_data=f"blind_date_cancel_{blind_date_obj.id}")]
     ])
     try:
         await callback.bot.send_message(partner.telegram_id, partner_text, reply_markup=partner_markup, parse_mode="Markdown")
-    except Exception:
-        await callback.bot.send_message(partner.telegram_id,
-                                        f"🌹 Пользователь {user.name or 'кто-то'} пригласил вас на свидание вслепую!\n\n"
-                                        f"🎵 Общий трек: {artist} — {song}\n\n"
-                                        "Прослушайте и нажмите кнопку ниже.\n\n"
-                                        "⏳ Ожидаем, пока партнёр тоже прослушает...\n"
-                                        "⏱️ Свидание будет автоматически отменено через 10 минут, если вы не подтвердите прослушивание.",
-                                        reply_markup=partner_markup)
+    except Exception as e:
+        logger.error(f"Failed to send blind date invitation to partner: {e}")
 
-    asyncio.create_task(cancel_blind_date_after_timeout(blind_date_obj.id, callback.bot, session.bind))
+    # Таймаут 10 минут
+    asyncio.create_task(blind_date_timeout(blind_date_obj.id, callback.bot, session.bind))
+
+async def blind_date_timeout(blind_date_id: int, bot, session_maker):
+    await asyncio.sleep(600)
+    async with session_maker() as session:
+        blind_date = await session.get(BlindDate, blind_date_id)
+        if not blind_date:
+            return
+        if blind_date.user1_listened and blind_date.user2_listened:
+            return  # уже завершено
+        user1 = await crud.get_user_by_id(session, blind_date.user1_id)
+        user2 = await crud.get_user_by_id(session, blind_date.user2_id)
+        await session.delete(blind_date)
+        await session.commit()
+        try:
+            await bot.send_message(user1.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 мин).")
+        except: pass
+        try:
+            await bot.send_message(user2.telegram_id, "⏰ Свидание вслепую отменено по истечении времени (10 мин).")
+        except: pass
 
 @router.callback_query(F.data.startswith("blind_date_listen_"))
 async def blind_date_listen(callback: CallbackQuery, session: AsyncSession):
-    try:
-        blind_date_id = int(callback.data.split("_")[-1])
-    except (IndexError, ValueError):
-        await callback.answer("Некорректный идентификатор.", show_alert=True)
-        return
-
-    blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
+    blind_date_id = int(callback.data.split("_")[-1])
+    blind_date = await session.get(BlindDate, blind_date_id)
     if not blind_date:
         await callback.answer("Это свидание уже неактивно.", show_alert=True)
         return
 
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
-        await callback.answer("Пользователь не найден.", show_alert=True)
+        await callback.answer("Ошибка")
         return
 
     if blind_date.user1_id != user.id and blind_date.user2_id != user.id:
         await callback.answer("Вы не участник этого свидания.", show_alert=True)
         return
 
-    both_listened = await crud.mark_blind_date_listened(session, blind_date_id, user.id)
+    # Отмечаем прослушивание
+    if blind_date.user1_id == user.id:
+        blind_date.user1_listened = True
+    else:
+        blind_date.user2_listened = True
+    await session.commit()
+
     await callback.answer("Отлично! Ждём партнёра.")
 
-    if both_listened:
+    if blind_date.user1_listened and blind_date.user2_listened:
+        # Оба прослушали – завершаем
         await callback.message.edit_reply_markup(reply_markup=None)
-
         user1 = await crud.get_user_by_id(session, blind_date.user1_id)
         user2 = await crud.get_user_by_id(session, blind_date.user2_id)
 
-        def get_contact_link(u):
+        def contact_link(u):
             if u.username:
                 return f"@{u.username}"
             else:
                 return f"[профиль](tg://user?id={u.telegram_id})"
 
-        link1 = get_contact_link(user1)
-        link2 = get_contact_link(user2)
+        link1 = contact_link(user1)
+        link2 = contact_link(user2)
 
-        safe_name1 = escape_markdown(user1.name or "Пользователь")
-        safe_name2 = escape_markdown(user2.name or "Пользователь")
-
-        text1 = (f"💞 Свидание вслепую состоялось!\n\n"
-                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n\n"
-                 f"Теперь вы можете обсудить его с {safe_name2}.\n"
-                 f"Контакты партнёра: {link2}\n\n"
-                 "Приятного общения!")
-        text2 = (f"💞 Свидание вслепую состоялось!\n\n"
-                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n\n"
-                 f"Теперь вы можете обсудить его с {safe_name1}.\n"
-                 f"Контакты партнёра: {link1}\n\n"
-                 "Приятного общения!")
-
+        text1 = (f"💞 Свидание вслепую состоялось!\n"
+                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n"
+                 f"Контакты партнёра: {link2}")
+        text2 = (f"💞 Свидание вслепую состоялось!\n"
+                 f"Вы оба прослушали трек **{blind_date.artist} — {blind_date.song}**.\n"
+                 f"Контакты партнёра: {link1}")
         try:
             await callback.bot.send_message(user1.telegram_id, text1, parse_mode="Markdown")
-        except Exception:
-            await callback.bot.send_message(user1.telegram_id, text1)
-
+        except: pass
         try:
             await callback.bot.send_message(user2.telegram_id, text2, parse_mode="Markdown")
-        except Exception:
-            await callback.bot.send_message(user2.telegram_id, text2)
-
-        await callback.message.answer("🎉 Свидание вслепую завершено! Контакты отправлены.")
+        except: pass
+        await callback.message.answer("🎉 Свидание завершено! Контакты отправлены.")
+        await session.delete(blind_date)
+        await session.commit()
     else:
         await callback.message.answer("✅ Вы подтвердили прослушивание. Ожидаем партнёра...")
 
 @router.callback_query(F.data.startswith("blind_date_cancel_"))
 async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
-    try:
-        blind_date_id = int(callback.data.split("_")[-1])
-    except (IndexError, ValueError):
-        await callback.answer("Некорректный идентификатор.", show_alert=True)
-        return
-
-    blind_date = await crud.get_blind_date_by_id(session, blind_date_id)
+    blind_date_id = int(callback.data.split("_")[-1])
+    blind_date = await session.get(BlindDate, blind_date_id)
     if not blind_date:
-        await callback.answer("Это свидание уже неактивно.", show_alert=True)
+        await callback.answer("Уже неактивно", show_alert=True)
         return
 
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
-    if not user:
-        await callback.answer("Пользователь не найден.", show_alert=True)
+    if not user or (blind_date.user1_id != user.id and blind_date.user2_id != user.id):
+        await callback.answer("Вы не участник", show_alert=True)
         return
 
-    if blind_date.user1_id != user.id and blind_date.user2_id != user.id:
-        await callback.answer("Вы не участник этого свидания.", show_alert=True)
-        return
-
-    user1 = await crud.get_user_by_id(session, blind_date.user1_id)
-    user2 = await crud.get_user_by_id(session, blind_date.user2_id)
+    # Уведомляем другого участника
+    other_id = blind_date.user2_id if blind_date.user1_id == user.id else blind_date.user1_id
+    other = await crud.get_user_by_id(session, other_id)
+    try:
+        await callback.bot.send_message(other.telegram_id, "❌ Свидание вслепую отменено другим участником.")
+    except: pass
 
     await session.delete(blind_date)
     await session.commit()
-
-    try:
-        await callback.bot.send_message(user1.telegram_id, "❌ Свидание вслепую отменено другим участником.")
-    except:
-        pass
-    try:
-        await callback.bot.send_message(user2.telegram_id, "❌ Свидание вслепую отменено другим участником.")
-    except:
-        pass
-
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Свидание отменено.")
     await callback.answer()
+
+# ===================== Конец свидания вслепую =====================
 
 @router.callback_query(F.data == "reset_history")
 async def reset_history(callback: CallbackQuery, session: AsyncSession):
