@@ -81,6 +81,9 @@ def normalize_city(city):
             return canonical
     return city_lower.capitalize()
 
+def validate_text_length(text, max_length=500):
+    return len(text) <= max_length
+
 def format_user_card(user, match_score=None):
     name_line = user.name or "Без имени"
     if user.is_premium:
