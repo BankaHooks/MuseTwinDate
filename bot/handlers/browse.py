@@ -35,10 +35,15 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Показать все анкеты", callback_data="show_all")],
+            [InlineKeyboardButton(text="🔄 Сбросить историю и показать всех", callback_data="show_all")],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
         ])
-        await target_message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=markup)
+        await target_message.answer(
+            "😕 Больше нет новых анкет.\n\n"
+            "Вы уже просмотрели всех доступных пользователей.\n"
+            "Нажмите «Сбросить историю», чтобы увидеть тех, кого вы пропустили ранее.",
+            reply_markup=markup
+        )
         await state.clear()
         return
 
@@ -133,8 +138,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         try:
             await callback.bot.send_message(
                 candidate.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\n"
-                f"Напишите ему: {user_link}",
+                f"💞 Взаимный лайк! Вы и **{safe_user_name}** понравились друг другу.\nНапишите ему: {user_link}",
                 parse_mode="Markdown"
             )
         except Exception as e:
@@ -142,8 +146,7 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
         try:
             await callback.bot.send_message(
                 user.telegram_id,
-                f"💞 Взаимный лайк! Вы и **{safe_candidate_name}** понравились друг другу.\n"
-                f"Напишите ему: {candidate_link}",
+                f"💞 Взаимный лайк! Вы и **{safe_candidate_name}** понравились друг другу.\nНапишите ему: {candidate_link}",
                 parse_mode="Markdown"
             )
         except Exception as e:
