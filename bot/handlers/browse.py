@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = Router()
 
-async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession, reset_skips: bool = False):
+async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext, session: AsyncSession):
     if isinstance(event, CallbackQuery):
         user_id = event.from_user.id
         target_message = event.message
@@ -31,10 +31,6 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
     if not user:
         await target_message.answer("Зарегистрируйтесь через /start")
         return
-
-    if reset_skips:
-        await session.execute(delete(Skip).where(Skip.user_id == user.id))
-        await session.commit()
 
     candidate, score = await pick_candidate_simple(session, user)
     if not candidate:
@@ -82,8 +78,14 @@ async def browse_start(callback: CallbackQuery, state: FSMContext, session: Asyn
 
 @router.callback_query(F.data == "show_all")
 async def show_all_callback(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
+        return
+    await session.execute(delete(Skip).where(Skip.user_id == user.id))
+    await session.commit()
     await callback.message.delete()
-    await show_candidate(callback.message, state, session, reset_skips=True)
+    await show_candidate(callback.message, state, session)
     await callback.answer()
 
 @router.callback_query(F.data == "like", Browse.candidate_id)
@@ -169,7 +171,19 @@ async def send_envelope_start(callback: CallbackQuery, state: FSMContext):
         return
     await state.update_data(like_target=candidate_id)
     await state.set_state(LikeMessageState.text)
-    await callback.message.answer("Введите сообщение, которое будет отправлено вместе с лайком:")
+    await callback.message.edit_caption(
+        caption="✉️ Введите текст сообщения, которое будет отправлено вместе с лайком.\n\nНапишите сообщение или нажмите «Отмена».",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_envelope")]
+        ])
+    )
+    await callback.answer()
+
+@router.callback_query(F.data == "cancel_envelope")
+async def cancel_envelope(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await state.clear()
+    await callback.message.delete()
+    await show_candidate(callback.message, state, session)
     await callback.answer()
 
 @router.message(LikeMessageState.text)
