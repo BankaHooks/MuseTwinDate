@@ -25,10 +25,20 @@ async def update_user(session: AsyncSession, user: User, **kwargs) -> User:
     await session.commit()
     return user
 
-async def create_like(session: AsyncSession, from_user_id: int, to_user_id: int) -> Like:
+async def create_like(session: AsyncSession, from_user_id: int, to_user_id: int) -> Optional[Like]:
+    existing = await session.execute(
+        select(Like).where(
+            and_(Like.from_user_id == from_user_id, Like.to_user_id == to_user_id)
+        )
+    )
+    existing = existing.scalar_one_or_none()
+    if existing:
+        return existing
+
     like = Like(from_user_id=from_user_id, to_user_id=to_user_id)
     session.add(like)
     await session.commit()
+
     other = await session.execute(
         select(Like).where(and_(Like.from_user_id == to_user_id, Like.to_user_id == from_user_id))
     )
@@ -126,10 +136,18 @@ async def get_candidate_pool(session: AsyncSession, current_user_id: int, limit:
     exclude = set([current_user_id] + skipped + blocked_by_me + blocked_me + liked_ids)
 
     stmt = select(User).where(
-        and_(User.id.notin_(exclude), User.is_banned == False)
+        and_(
+            User.id.notin_(exclude),
+            User.is_banned == False,
+            User.is_hidden == False
+        )
     )
     if current_user.search_city_only and current_user.city:
         stmt = stmt.where(User.city == current_user.city)
+    if current_user.preferred_gender == "Мужской":
+        stmt = stmt.where(User.gender == "Мужской")
+    elif current_user.preferred_gender == "Женский":
+        stmt = stmt.where(User.gender == "Женский")
     stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()

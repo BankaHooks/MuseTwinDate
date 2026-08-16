@@ -16,9 +16,6 @@ from utils.media import save_photo
 
 router = Router()
 
-def _restore(text):
-    return text.replace("_", " ")
-
 @router.callback_query(F.data == "profile")
 async def profile_view(callback: CallbackQuery, session: AsyncSession):
     await show_profile(callback.message, callback.from_user.id, session, delete_old=True)
@@ -70,6 +67,18 @@ async def toggle_city(callback: CallbackQuery, session: AsyncSession):
     await callback.message.delete()
     await show_profile(callback.message, callback.from_user.id, session, delete_old=False)
     await callback.answer("Настройка обновлена")
+
+@router.callback_query(F.data == "toggle_hide")
+async def toggle_hide(callback: CallbackQuery, session: AsyncSession):
+    user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+    if not user:
+        await callback.answer("Зарегистрируйтесь через /start")
+        return
+    user.is_hidden = not user.is_hidden
+    await session.commit()
+    await callback.message.delete()
+    await show_profile(callback.message, callback.from_user.id, session, delete_old=False)
+    await callback.answer("Анкета обновлена")
 
 @router.callback_query(F.data.startswith("edit_"))
 async def edit_field(callback: CallbackQuery, state: FSMContext):
@@ -158,7 +167,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
 
 @router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("cat_"))
 async def edit_show_interests(callback: CallbackQuery, state: FSMContext):
-    category = _restore(callback.data.split("_", 1)[1])
+    category = callback.data.split("_", 1)[1].replace("_", " ")
     data = await state.get_data()
     selected = data.get("interests_list", [])
     await state.update_data(current_category=category)
@@ -167,7 +176,7 @@ async def edit_show_interests(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(ProfileEdit.interests), F.data.startswith("interest_"))
 async def edit_toggle_interest(callback: CallbackQuery, state: FSMContext):
-    topic = _restore(callback.data.split("_", 1)[1])
+    topic = callback.data.split("_", 1)[1].replace("_", " ")
     data = await state.get_data()
     selected = data.get("interests_list", [])
     if topic in selected:

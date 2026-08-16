@@ -25,6 +25,7 @@ class User(Base):
     premium_expiry = Column(DateTime, nullable=True)
     is_admin = Column(Boolean, default=False)
     is_banned = Column(Boolean, default=False)
+    is_hidden = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_security_notice = Column(DateTime, nullable=True)
     likes_today = Column(Integer, default=0)
