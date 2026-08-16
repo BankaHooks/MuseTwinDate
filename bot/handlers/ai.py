@@ -8,9 +8,10 @@ import random
 from database import crud
 from database.models import Skip, Like
 from utils.ai import generate_icebreakers, analyze_music_taste, get_match_recommendation, generate_blind_date_questions
-from keyboards.inline import premium_features_keyboard
+from keyboards.inline import premium_features_keyboard, browse_actions_keyboard
 from keyboards.reply import main_reply_keyboard
 from utils.security import escape_markdown
+from states.browse import Browse
 
 router = Router()
 
@@ -69,7 +70,7 @@ async def premium_features_menu(callback: CallbackQuery, session: AsyncSession):
     await callback.answer()
 
 @router.callback_query(F.data == "ai_match")
-async def ai_match(callback: CallbackQuery, session: AsyncSession):
+async def ai_match(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user or not user.is_premium:
         await callback.answer("Только для премиум!", show_alert=True)
@@ -92,8 +93,9 @@ async def ai_match(callback: CallbackQuery, session: AsyncSession):
         if candidate.city:
             text += f"Город: {candidate.city}\n"
         text += f"\nПричина: {result['explanation']}\n\n"
-        text += "Хотите посмотреть анкету этого человека?"
-        from keyboards.inline import browse_actions_keyboard
+        text += "Хотите лайкнуть или пропустить?"
+        await state.set_state(Browse.candidate_id)
+        await state.update_data(candidate_id=candidate.id)
         markup = browse_actions_keyboard()
         await callback.message.edit_text(text, reply_markup=markup)
     else:

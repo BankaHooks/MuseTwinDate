@@ -4,6 +4,12 @@ from sqlalchemy.orm import relationship
 from .db import Base
 
 class User(Base):
+    from datetime import datetime
+from sqlalchemy import Column, BigInteger, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy.orm import relationship
+from .db import Base
+
+class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger, unique=True, nullable=False)
@@ -15,8 +21,6 @@ class User(Base):
     favorite_genres = Column(Text, nullable=True)
     favorite_bands = Column(Text, nullable=True)
     favorite_songs = Column(Text, nullable=True)
-    vk_songs = Column(Text, nullable=True)
-    vk_bands = Column(Text, nullable=True)
     search_goal = Column(String(50), nullable=True)
     interests = Column(Text, nullable=True)
     preferred_gender = Column(String(50), nullable=True)

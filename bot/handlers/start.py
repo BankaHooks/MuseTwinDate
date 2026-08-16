@@ -12,8 +12,6 @@ from keyboards.inline import (
 from keyboards.reply import main_reply_keyboard
 from utils.helpers import validate_age, normalize_city
 from utils.media import save_photo
-from utils.vk_api import enrich_profile_with_vk
-from config import config
 
 router = Router()
 
@@ -233,8 +231,6 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
                 bio=data.get("bio"),
                 photo_file_id=photo_file_id,
             )
-            if config.VK_ACCESS_TOKEN:
-                await enrich_profile_with_vk(user, session, config.VK_ACCESS_TOKEN)
             await message.answer("Профиль обновлён!", reply_markup=main_reply_keyboard())
     else:
         user = await crud.create_user(
@@ -254,17 +250,13 @@ async def reg_photo(message: Message, state: FSMContext, session: AsyncSession):
             bio=data.get("bio"),
             photo_file_id=photo_file_id,
         )
-        if config.VK_ACCESS_TOKEN:
-            await enrich_profile_with_vk(user, session, config.VK_ACCESS_TOKEN)
-        await message.answer("Регистрация завершена!", reply_markup=main_reply_keyboard())
+        await message.answer(
+            "✅ Регистрация завершена!\n\n"
+            "В профиле вы можете скрыть анкету и сменить режим поиска (по всей стране / только в своём городе).\n"
+            "[Настоятельно рекомендуется использовать поиск по всей стране на время запуска бота]",
+            reply_markup=main_reply_keyboard()
+        )
     await state.clear()
-    await message.answer(
-    "✅ Регистрация завершена!\n\n"
-    "🔗 Вы также можете привязать VK для более точного подбора по музыкальным предпочтениям.\n"
-    "Для этого зайдите в профиль → Редактировать профиль → Импорт из VK. \n" \
-    "А также в профиле мы можете выключить анкету, и сменить режим поиска (по всей стране/только в своем городе) \n" \
-    "[Настоятельно рекомендуется использовать поиск по всей стране на время запуска бота]"
-    )   
 
 @router.callback_query(F.data == "cancel")
 async def cancel_callback(callback: CallbackQuery, state: FSMContext):
