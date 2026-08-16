@@ -94,8 +94,8 @@ async def process_city(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("genre_cat_"), RegistrationState.genres)
 async def genre_category_selected(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1]
-    category = category.replace("_", " ").strip()
+    category = callback.data[len("genre_cat_"):]
+    category = category.replace('_', ' ').strip()
     data = await state.get_data()
     selected = data.get("selected_genres", [])
     await state.update_data(current_genre_category=category)
@@ -105,8 +105,8 @@ async def genre_category_selected(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("genre_item_"), RegistrationState.genres)
 async def genre_item_selected(callback: CallbackQuery, state: FSMContext):
-    genre = callback.data.split("_", 1)[1]
-    genre = genre.replace("_", " ")
+    genre = callback.data[len("genre_item_"):]
+    genre = genre.replace('_', ' ')
     data = await state.get_data()
     selected = data.get("selected_genres", [])
     if genre in selected:
@@ -183,8 +183,8 @@ async def process_goal(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("cat_"), RegistrationState.interests)
 async def process_interest_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1]
-    category = category.replace("_", " ").strip()
+    category = callback.data[len("cat_"):]
+    category = category.replace('_', ' ').strip()
     data = await state.get_data()
     selected = data.get("selected_interests", [])
     await state.update_data(current_category=category)
@@ -194,8 +194,8 @@ async def process_interest_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("interest_"), RegistrationState.interests)
 async def process_interest_item(callback: CallbackQuery, state: FSMContext):
-    item = callback.data.split("_", 1)[1]
-    item = item.replace("_", " ")
+    item = callback.data[len("interest_"):]
+    item = item.replace('_', ' ')
     data = await state.get_data()
     selected = data.get("selected_interests", [])
     if item in selected:
@@ -233,8 +233,8 @@ async def process_interests_done(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("gamecat_"), RegistrationState.games)
 async def process_games_category(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("_", 1)[1]
-    category = category.replace("_", " ").strip()
+    category = callback.data[len("gamecat_"):]
+    category = category.replace('_', ' ').strip()
     data = await state.get_data()
     selected = data.get("selected_games", [])
     await state.update_data(current_game_category=category)
@@ -244,8 +244,8 @@ async def process_games_category(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("game_"), RegistrationState.games)
 async def process_game_item(callback: CallbackQuery, state: FSMContext):
-    game = callback.data.split("_", 1)[1]
-    game = game.replace("_", " ")
+    game = callback.data[len("game_"):]
+    game = game.replace('_', ' ')
     data = await state.get_data()
     selected = data.get("selected_games", [])
     if game in selected:
