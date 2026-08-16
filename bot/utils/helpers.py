@@ -158,3 +158,16 @@ def parse_comma_separated(text: str) -> set:
     if not text:
         return set()
     return {item.strip().lower() for item in text.split(',') if item.strip()}
+
+def normalize_goal(goal: str) -> str:
+    """Приводит цель к английскому ключу (flirt, communication, friendship, relationship)"""
+    if not goal:
+        return None
+    # Если уже английский ключ
+    if goal in GOAL_TRANSLATE:
+        return goal
+    # Если русское название, ищем обратный перевод
+    for key, value in GOAL_TRANSLATE.items():
+        if value == goal:
+            return key
+    return goal  # fallback

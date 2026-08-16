@@ -3,16 +3,17 @@ from typing import Optional, Tuple, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import User
+from utils.helpers import parse_comma_separated, normalize_goal
 
 logger = logging.getLogger(__name__)
 
 # Веса для расчёта совпадения (сумма = 1.0)
-WEIGHT_SONGS = 0.30
+WEIGHT_SONGS = 0.35
 WEIGHT_BANDS = 0.20
-WEIGHT_GENRES = 0.15
+WEIGHT_GENRES = 0.20
 WEIGHT_GAMES = 0.15
-WEIGHT_INTERESTS = 0.10
-WEIGHT_GOAL = 0.10
+WEIGHT_INTERESTS = 0.05
+WEIGHT_GOAL = 0.05
 
 def jaccard_similarity(set1: set, set2: set) -> float:
     if not set1 or not set2:
@@ -20,11 +21,6 @@ def jaccard_similarity(set1: set, set2: set) -> float:
     intersection = len(set1 & set2)
     union = len(set1 | set2)
     return intersection / union if union > 0 else 0.0
-
-def parse_comma_separated(text: str) -> set:
-    if not text:
-        return set()
-    return {item.strip().lower() for item in text.split(',') if item.strip()}
 
 def calculate_match_score(user1: User, user2: User) -> float:
     songs1 = parse_comma_separated(user1.favorite_songs)
@@ -43,7 +39,11 @@ def calculate_match_score(user1: User, user2: User) -> float:
     genres_score = jaccard_similarity(genres1, genres2)
     games_score = jaccard_similarity(games1, games2)
     interests_score = jaccard_similarity(interests1, interests2)
-    goal_score = 1.0 if user1.search_goal and user2.search_goal and user1.search_goal == user2.search_goal else 0.0
+
+    # Нормализация целей к английским ключам
+    goal1 = normalize_goal(user1.search_goal)
+    goal2 = normalize_goal(user2.search_goal)
+    goal_score = 1.0 if goal1 and goal2 and goal1 == goal2 else 0.0
 
     total_score = (
         songs_score * WEIGHT_SONGS +
@@ -56,10 +56,6 @@ def calculate_match_score(user1: User, user2: User) -> float:
     return total_score
 
 async def get_candidates_sorted(session: AsyncSession, user: User, limit: int = 5) -> List[Tuple[User, float]]:
-    """
-    Возвращает список кортежей (User, score), отсортированный по убыванию оценки.
-    limit – сколько кандидатов вернуть (максимум 5 по умолчанию).
-    """
     candidates = await crud.get_candidate_pool(session, user.id, limit=300)
     if not candidates:
         return []

@@ -47,6 +47,7 @@ async def show_candidate(event: Union[Message, CallbackQuery], state: FSMContext
         await state.clear()
         return
 
+    # Устанавливаем состояние и данные
     await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
 
@@ -242,6 +243,7 @@ async def show_next_from_message(message: Message, state: FSMContext, session: A
         await message.answer("Нет больше новых анкет. Хотите посмотреть уже просмотренные?", reply_markup=main_reply_keyboard())
         await state.clear()
         return
+    await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
     text = format_user_card(candidate, score)
     markup = browse_actions_keyboard()
@@ -303,6 +305,7 @@ async def show_next(callback: CallbackQuery, state: FSMContext, session: AsyncSe
         await state.clear()
         await callback.answer()
         return
+    await state.set_state(Browse.candidate_id)
     await state.update_data(candidate_id=candidate.id)
 
     data = await state.get_data()
