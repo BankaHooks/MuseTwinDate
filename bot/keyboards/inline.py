@@ -159,7 +159,15 @@ def preferred_gender_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def genre_choose_keyboard():
-    genres = ["Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical", "Hip-Hop", "Country", "Blues", "Metal", "Other"]
+    genres = [
+        "Rock", "Pop", "Jazz", "Electronic", "Indie", "Classical",
+        "Hip-Hop", "Country", "Blues", "Metal", "Other",
+        "Russian Rock", "Alternative Rock", "Punk Rock", "Hard Rock",
+        "Russian Pop", "K-Pop", "J-Pop", "Pop Rock",
+        "Techno", "House", "Drum & Bass", "Dubstep", "Synthwave",
+        "Russian Rap", "R&B", "Soul", "Folk", "Instrumental",
+        "Chanson", "Ethno", "Acoustic", "Ambient", "Trance"
+    ]
     buttons = [[InlineKeyboardButton(text=g, callback_data=f"genre_add_{g}")] for g in genres]
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="genres_done")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
