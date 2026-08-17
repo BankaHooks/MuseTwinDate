@@ -449,4 +449,4 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
         await show_profile_for_message(event, session)
     else:
         await event.answer("Профиль обновлён!")
-        await show_profile(event, session)
+        await show_profile(event, session)  

@@ -98,7 +98,9 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
+    # Удаляем и скипы, и лайки, чтобы показать всех заново
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
+    await session.execute(delete(Like).where(Like.from_user_id == user.id))
     await session.commit()
     await state.clear()
     await callback.message.delete()
@@ -142,7 +144,6 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             logger.error(f"Failed to send like count notification: {e}")
 
     if like.is_mutual:
-        # Экранируем имена, но отправляем без Markdown, чтобы избежать ошибок парсинга
         safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
         safe_candidate_name = escape_markdown(candidate.name or candidate.username or "Пользователь")
         user_link = f"@{user.username}" if user.username else f"профиль (tg://user?id={user.telegram_id})"
