@@ -27,6 +27,9 @@ class DBSessionMiddleware(BaseMiddleware):
     ) -> Any:
         async with AsyncSessionLocal() as session:
             data["session"] = session
+            tg_user = getattr(event.event, "from_user", None)
+            if tg_user:
+                data["user"] = await crud.get_user_by_telegram_id(session, tg_user.id)
             return await handler(event, data)
 
 class ActivityMiddleware(BaseMiddleware):
