@@ -80,10 +80,9 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
         "goal": ("Выберите новую цель:", ProfileEditState.goal),
         "interests": ("Выберите новые интересы:", ProfileEditState.interests),
         "games": ("Выберите новые игры:", ProfileEditState.games),
+        "preferred_gender": ("Выберите предпочитаемый пол партнёра:", ProfileEditState.preferred_gender),
         "bio": ("Введите новое био (до 500 символов):", ProfileEditState.bio),
         "photo": ("Отправьте новое фото:", ProfileEditState.photo),
-        # Добавлен ключ для редактирования пола партнёра
-        "preferred_gender": ("Выберите предпочитаемый пол партнёра:", ProfileEditState.preferred_gender),
     }
     if field not in field_map:
         await callback.answer("Неизвестное поле")
@@ -227,7 +226,7 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     await finish_edit(callback, state, session)
 
 # === Обработчики для предпочитаемого пола партнёра ===
-@router.callback_query(F.data == "edit_preferred_gender", StateFilter(ProfileEditState.preferred_gender))
+@router.callback_query(F.data == "edit_preferred_gender")
 async def edit_preferred_gender(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ProfileEditState.preferred_gender)
     await edit_or_caption(callback, "Выберите предпочитаемый пол партнёра:", reply_markup=preferred_gender_keyboard())
@@ -435,7 +434,6 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     for key, value in update_data.items():
         if hasattr(user, key):
             setattr(user, key, value)
-    # Явное сохранение полей с несовпадающими именами
     if "genres" in data:
         user.favorite_genres = data["genres"]
     if "bands" in data:
