@@ -96,7 +96,7 @@ async def create_or_update_user(session: AsyncSession, bot: Bot, data: dict):
 
     # Загрузка фото
     photo_file_id = None
-    photo_path = os.path.join("bot", "bot-photo", data["photo"])
+    photo_path = os.path.join("bots-photo", data["photo"])
     if os.path.exists(photo_path):
         try:
             admin_id = config.ADMIN_IDS[0] if config.ADMIN_IDS else None
