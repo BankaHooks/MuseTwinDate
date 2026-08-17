@@ -1,83 +1,181 @@
 import asyncio
-import random
-from datetime import datetime
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import select
-from database.models import User
-from database.db import Base, DATABASE_URL
-from utils.helpers import normalize_city
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Настройте подключение к БД (используем существующий DATABASE_URL из config)
+from aiogram import Bot
+from aiogram.types import InputFile
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select, delete
+import os
 from config import config
-DATABASE_URL = config.DATABASE_URL
-engine = create_async_engine(DATABASE_URL, echo=False)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
+from database.models import User
+from database.db import Base
 
-# Здесь вы заполняете данные для 10 пользователей
 USERS_DATA = [
     {
-        "username": "user1",
         "name": "Анна",
         "gender": "Женский",
         "age": 22,
         "city": "Москва",
-        "favorite_genres": "Pop, Electronic, Indie",
-        "favorite_bands": "The Weeknd, Dua Lipa, Billie Eilish",
-        "favorite_songs": "Blinding Lights, Levitating, Bad Guy",
-        "search_goal": "Общение",
-        "interests": "Кино, Путешествия, Фотография",
-        "bio": "Люблю музыку и хорошие фильмы. Ищу новых друзей.",
-        "photo_path": None,  # укажите путь к фото, например "photos/anna.jpg" или оставьте None
+        "genres": "Rock, Pop, Electronic",
+        "bands": "The Beatles, Queen, Daft Punk",
+        "songs": "Bohemian Rhapsody, Yesterday, Around the World",
+        "goal": "Общение",
+        "interests": "Кино, Книги, Путешествия",
+        "games": "Minecraft, Among Us",
+        "bio": "Люблю музыку, увлекаюсь фотографией. Ищу единомышленников.",
+        "photo": "user1.jpg",
+        "telegram_id": -1
     },
-    # ... добавьте ещё 9 пользователей
+    {
+        "name": "Максим",
+        "gender": "Мужской",
+        "age": 25,
+        "city": "Санкт-Петербург",
+        "genres": "Jazz, Blues, Classical",
+        "bands": "Miles Davis, Nina Simone, Chopin",
+        "songs": "Kind of Blue, Feeling Good, Nocturne",
+        "goal": "Дружба",
+        "interests": "Музыка, Искусство, Прогулки",
+        "games": "Rust, Valheim",
+        "bio": "Джаз и классика — моя страсть. Ищу собеседников с похожим вкусом.",
+        "photo": "user2.jpg",
+        "telegram_id": -2
+    },
+    {
+        "name": "Екатерина",
+        "gender": "Женский",
+        "age": 21,
+        "city": "Екатеринбург",
+        "genres": "Pop, Indie, Russian Pop",
+        "bands": "Billie Eilish, Arctic Monkeys, Монеточка",
+        "songs": "bad guy, Do I Wanna Know?, каждый раз",
+        "goal": "Флирт",
+        "interests": "Сериалы, Танцы, Кофе",
+        "games": "It Takes Two, Overcooked",
+        "bio": "Люблю инди-музыку и атмосферные вечера. Ищу приключений.",
+        "photo": "user3.jpg",
+        "telegram_id": -3
+    },
+    {
+        "name": "Игорь",
+        "gender": "Мужской",
+        "age": 27,
+        "city": "Новосибирск",
+        "genres": "Metal, Heavy Metal, Thrash",
+        "bands": "Metallica, Slayer, Iron Maiden",
+        "songs": "Master of Puppets, Raining Blood, The Trooper",
+        "goal": "Общение",
+        "interests": "Гитара, Концерты, Спорт",
+        "games": "Counter-Strike 2, Doom",
+        "bio": "Металл — моя жизнь. Играю на гитаре. Жду единомышленников.",
+        "photo": "user4.jpg",
+        "telegram_id": -4
+    },
+    {
+        "name": "Ольга",
+        "gender": "Женский",
+        "age": 23,
+        "city": "Казань",
+        "genres": "Electronic, House, Synthwave",
+        "bands": "Kraftwerk, Daft Punk, Justice",
+        "songs": "Trans-Europe Express, One More Time, Genesis",
+        "goal": "Отношения",
+        "interests": "Синтезаторы, Киберпанк, Ночная жизнь",
+        "games": "Cyberpunk 2077, Deus Ex",
+        "bio": "Фанат электронной музыки и киберпанк-эстетики. Ищу собеседника для глубоких разговоров.",
+        "photo": "user5.jpg",
+        "telegram_id": -5
+    }
 ]
 
-async def create_user(session: AsyncSession, data: dict):
-    # Проверяем, есть ли уже такой username (чтобы не дублировать)
-    stmt = select(User).where(User.username == data["username"])
+async def create_or_update_user(session: AsyncSession, bot: Bot, data: dict):
+    """Создаёт или обновляет пользователя в БД, загружает фото и получает file_id."""
+    telegram_id = data["telegram_id"]
+    stmt = select(User).where(User.telegram_id == telegram_id)
     result = await session.execute(stmt)
-    existing = result.scalar_one_or_none()
-    if existing:
-        logger.info(f"Пользователь {data['username']} уже существует, пропускаем")
-        return None
+    user = result.scalar_one_or_none()
 
-    # Если фото указано, пробуем прочитать и сохранить file_id (но это требует загрузки в Telegram)
-    # Для простоты мы будем сохранять только локальный путь, а file_id не заполняем.
-    user = User(
-        telegram_id=random.randint(100000000, 999999999),  # случайный ID, но лучше использовать отрицательные числа для ботов
-        username=data["username"],
-        name=data["name"],
-        gender=data["gender"],
-        age=data["age"],
-        city=normalize_city(data["city"]),
-        favorite_genres=data["favorite_genres"],
-        favorite_bands=data["favorite_bands"],
-        favorite_songs=data["favorite_songs"],
-        search_goal=data["search_goal"],
-        interests=data["interests"],
-        bio=data["bio"],
-        photo_local_path=data.get("photo_path"),
-        photo_file_id=None,  # не загружаем в Telegram
-        is_hidden=False,
-        is_banned=False,
-        is_premium=False,
-        created_at=datetime.utcnow(),
-        last_activity=datetime.utcnow(),
-    )
-    session.add(user)
+    # Загрузка фото
+    photo_file_id = None
+    photo_path = os.path.join("bot", "bot-photo", data["photo"])
+    if os.path.exists(photo_path):
+        try:
+            admin_id = config.ADMIN_IDS[0] if config.ADMIN_IDS else None
+            if admin_id:
+                with open(photo_path, 'rb') as f:
+                    msg = await bot.send_photo(chat_id=admin_id, photo=InputFile(f))
+                    photo_file_id = msg.photo[-1].file_id
+                    # Удаляем сообщение, чтобы не засорять чат
+                    await bot.delete_message(chat_id=admin_id, message_id=msg.message_id)
+                    print(f"Загружено фото для {data['name']}: {photo_file_id}")
+            else:
+                print("Нет ADMIN_IDS, пропускаем загрузку фото.")
+        except Exception as e:
+            print(f"Ошибка загрузки фото для {data['name']}: {e}")
+    else:
+        print(f"Файл {photo_path} не найден, пропускаем фото.")
+
+    if user:
+        user.username = f"test_{telegram_id}"  # можно задать уникальный username
+        user.name = data["name"]
+        user.gender = data["gender"]
+        user.age = data["age"]
+        user.city = data["city"]
+        user.favorite_genres = data["genres"]
+        user.favorite_bands = data["bands"]
+        user.favorite_songs = data["songs"]
+        user.search_goal = data["goal"]
+        user.interests = data["interests"]
+        user.favorite_games = data["games"]
+        user.bio = data["bio"]
+        if photo_file_id:
+            user.photo_file_id = photo_file_id
+        user.photo_local_path = photo_path if os.path.exists(photo_path) else None
+        user.is_hidden = False
+        user.is_banned = False
+        print(f"Обновлён пользователь {data['name']} (telegram_id={telegram_id})")
+    else:
+        new_user = User(
+            telegram_id=telegram_id,
+            username=f"test_{telegram_id}",
+            name=data["name"],
+            gender=data["gender"],
+            age=data["age"],
+            city=data["city"],
+            favorite_genres=data["genres"],
+            favorite_bands=data["bands"],
+            favorite_songs=data["songs"],
+            search_goal=data["goal"],
+            interests=data["interests"],
+            favorite_games=data["games"],
+            bio=data["bio"],
+            photo_file_id=photo_file_id,
+            photo_local_path=photo_path if os.path.exists(photo_path) else None,
+            is_hidden=False,
+            is_banned=False,
+            is_premium=False
+        )
+        session.add(new_user)
+        print(f"Создан пользователь {data['name']} (telegram_id={telegram_id})")
+
     await session.commit()
-    logger.info(f"Создан пользователь {user.name} ({user.username})")
-    return user
 
 async def main():
+    engine = create_async_engine(config.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    
     async with async_session() as session:
-        for data in USERS_DATA:
-            await create_user(session, data)
-    logger.info("Готово!")
+        await session.execute(delete(User).where(User.telegram_id < 0))
+        await session.commit()
+        print("Старые тестовые пользователи удалены.")
+
+        bot = Bot(token=config.BOT_TOKEN)
+        try:
+            for data in USERS_DATA:
+                await create_or_update_user(session, bot, data)
+        finally:
+            await bot.session.close()
+
+    print("Готово! Создано/обновлено 5 тестовых пользователей.")
 
 if __name__ == "__main__":
     asyncio.run(main())
