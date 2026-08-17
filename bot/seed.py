@@ -11,9 +11,9 @@ from database.db import Base
 
 USERS_DATA = [
     {
-        "name": "Анна",
+        "name": "Аня",
         "gender": "Женский",
-        "age": 22,
+        "age": 18,
         "city": "Москва",
         "genres": "Rock, Pop, Electronic",
         "bands": "The Beatles, Queen, Daft Punk",
@@ -21,14 +21,14 @@ USERS_DATA = [
         "goal": "Общение",
         "interests": "Кино, Книги, Путешествия",
         "games": "Minecraft, Among Us",
-        "bio": "Люблю музыку, увлекаюсь фотографией. Ищу единомышленников.",
+        "bio": "Люблю музыку, увлекаюсь фотографией.",
         "photo": "first.png",
         "telegram_id": -1
     },
     {
-        "name": "Максим",
+        "name": "Максон",
         "gender": "Мужской",
-        "age": 25,
+        "age": 21,
         "city": "Санкт-Петербург",
         "genres": "Jazz, Blues, Classical",
         "bands": "Miles Davis, Nina Simone, Chopin",
@@ -36,14 +36,14 @@ USERS_DATA = [
         "goal": "Дружба",
         "interests": "Музыка, Искусство, Прогулки",
         "games": "Rust, Valheim",
-        "bio": "Джаз и классика — моя страсть. Ищу собеседников с похожим вкусом.",
+        "bio": "Ищу с кем поиграть в раст, ну и не только.",
         "photo": "second.png",
         "telegram_id": -2
     },
     {
-        "name": "Екатерина",
+        "name": "Катяяя",
         "gender": "Женский",
-        "age": 21,
+        "age": 18,
         "city": "Екатеринбург",
         "genres": "Pop, Indie, Russian Pop",
         "bands": "Billie Eilish, Arctic Monkeys, Монеточка",
@@ -56,9 +56,9 @@ USERS_DATA = [
         "telegram_id": -3
     },
     {
-        "name": "Игорь",
+        "name": "Илья",
         "gender": "Мужской",
-        "age": 27,
+        "age": 19,
         "city": "Новосибирск",
         "genres": "Metal, Heavy Metal, Thrash",
         "bands": "Metallica, Slayer, Iron Maiden",
@@ -71,9 +71,9 @@ USERS_DATA = [
         "telegram_id": -4
     },
     {
-        "name": "Ольга",
+        "name": "Оля",
         "gender": "Женский",
-        "age": 23,
+        "age": 18,
         "city": "Казань",
         "genres": "Electronic, House, Synthwave",
         "bands": "Kraftwerk, Daft Punk, Justice",
