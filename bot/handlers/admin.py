@@ -98,7 +98,16 @@ async def admin_users_menu(callback: CallbackQuery, session: AsyncSession):
         select(func.count()).select_from(User).where(User.last_activity >= datetime.utcnow() - timedelta(days=7))
     )
     premium = await session.scalar(select(func.count()).select_from(User).where(User.is_premium == True))
-    text = f"📊 Статистика:\nВсего: {total}\nМужчин: {male}\nЖенщин: {female}\nАктивных (7 дней): {active}\nПремиум: {premium}"
+    hidden = await session.scalar(select(func.count()).select_from(User).where(User.is_hidden == True))
+    banned = await session.scalar(select(func.count()).select_from(User).where(User.is_banned == True))
+    text = (f"📊 Статистика:\n"
+            f"Всего: {total}\n"
+            f"Мужчин: {male}\n"
+            f"Женщин: {female}\n"
+            f"Активных (7 дней): {active}\n"
+            f"Премиум: {premium}\n"
+            f"Скрытых: {hidden}\n"
+            f"Забаненных: {banned}")
     buttons = [
         [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users_list_all_0")],
         [InlineKeyboardButton(text="👨 Мужчины", callback_data="admin_users_list_male_0")],
@@ -134,7 +143,12 @@ async def admin_users_list(callback: CallbackQuery, session: AsyncSession):
     buttons = []
     for u in users:
         name = u.name or u.username or "Без имени"
-        text += f"ID {u.id}: {name} ({(u.username) and '@'+u.username or 'нет юза'})\n"
+        status = ""
+        if u.is_hidden:
+            status += "🔒 "
+        if u.is_premium:
+            status += "⭐ "
+        text += f"ID {u.id}: {status}{name} ({(u.username) and '@'+u.username or 'нет юза'})\n"
         buttons.append([InlineKeyboardButton(
             text=f"👤 {name}",
             callback_data=f"admin_user_detail_{u.id}"
@@ -212,7 +226,6 @@ async def admin_notify_text(message: Message, state: FSMContext, session: AsyncS
         [InlineKeyboardButton(text="Отмена", callback_data="admin_close")]
     ])
     await message.answer(f"Подтвердите рассылку:\n\n{text}", reply_markup=kb)
-    # state.clear() удалён — теперь не стираем notify_text преждевременно
 
 @router.callback_query(F.data.startswith("admin_send_"))
 async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
