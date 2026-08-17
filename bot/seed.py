@@ -22,7 +22,7 @@ USERS_DATA = [
         "interests": "Кино, Книги, Путешествия",
         "games": "Minecraft, Among Us",
         "bio": "Люблю музыку, увлекаюсь фотографией. Ищу единомышленников.",
-        "photo": "/bots-photo/first.png",
+        "photo": "first.png",
         "telegram_id": -1
     },
     {
@@ -37,7 +37,7 @@ USERS_DATA = [
         "interests": "Музыка, Искусство, Прогулки",
         "games": "Rust, Valheim",
         "bio": "Джаз и классика — моя страсть. Ищу собеседников с похожим вкусом.",
-        "photo": "/bots-photo/second.png",
+        "photo": "second.png",
         "telegram_id": -2
     },
     {
@@ -52,7 +52,7 @@ USERS_DATA = [
         "interests": "Сериалы, Танцы, Кофе",
         "games": "It Takes Two, Overcooked",
         "bio": "Люблю инди-музыку и атмосферные вечера. Ищу приключений.",
-        "photo": "/bots-photo/third.png",
+        "photo": "third.png",
         "telegram_id": -3
     },
     {
@@ -67,7 +67,7 @@ USERS_DATA = [
         "interests": "Гитара, Концерты, Спорт",
         "games": "Counter-Strike 2, Doom",
         "bio": "Металл — моя жизнь. Играю на гитаре. Жду единомышленников.",
-        "photo": "/bots-photo/fourth.png",
+        "photo": "fourth.png",
         "telegram_id": -4
     },
     {
@@ -82,7 +82,7 @@ USERS_DATA = [
         "interests": "Синтезаторы, Киберпанк, Ночная жизнь",
         "games": "Cyberpunk 2077, Deus Ex",
         "bio": "Фанат электронной музыки и киберпанк-эстетики. Ищу собеседника для глубоких разговоров.",
-        "photo": "/bots-photo/fifth.png",
+        "photo": "fifth.png",
         "telegram_id": -5
     }
 ]
