@@ -1,6 +1,6 @@
 import asyncio
 from aiogram import Bot
-from aiogram.types import InputFile
+from aiogram.types import FSInputFile
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, delete
@@ -88,25 +88,25 @@ USERS_DATA = [
 ]
 
 async def create_or_update_user(session: AsyncSession, bot: Bot, data: dict):
-    """Создаёт или обновляет пользователя в БД, загружает фото и получает file_id."""
     telegram_id = data["telegram_id"]
     stmt = select(User).where(User.telegram_id == telegram_id)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
-    # Загрузка фото
     photo_file_id = None
-    photo_path = os.path.join("bots-photo", data["photo"])
+    # Используем абсолютный путь относительно места запуска
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    photo_path = os.path.join(base_dir, "bots-photo", data["photo"])
+
     if os.path.exists(photo_path):
         try:
             admin_id = config.ADMIN_IDS[0] if config.ADMIN_IDS else None
             if admin_id:
-                with open(photo_path, 'rb') as f:
-                    msg = await bot.send_photo(chat_id=admin_id, photo=InputFile(f))
-                    photo_file_id = msg.photo[-1].file_id
-                    # Удаляем сообщение, чтобы не засорять чат
-                    await bot.delete_message(chat_id=admin_id, message_id=msg.message_id)
-                    print(f"Загружено фото для {data['name']}: {photo_file_id}")
+                photo_file = FSInputFile(photo_path)
+                msg = await bot.send_photo(chat_id=admin_id, photo=photo_file)
+                photo_file_id = msg.photo[-1].file_id
+                await bot.delete_message(chat_id=admin_id, message_id=msg.message_id)
+                print(f"Загружено фото для {data['name']}: {photo_file_id}")
             else:
                 print("Нет ADMIN_IDS, пропускаем загрузку фото.")
         except Exception as e:
@@ -115,7 +115,7 @@ async def create_or_update_user(session: AsyncSession, bot: Bot, data: dict):
         print(f"Файл {photo_path} не найден, пропускаем фото.")
 
     if user:
-        user.username = f"test_{telegram_id}"  # можно задать уникальный username
+        user.username = f"test_{telegram_id}"
         user.name = data["name"]
         user.gender = data["gender"]
         user.age = data["age"]
@@ -162,7 +162,7 @@ async def create_or_update_user(session: AsyncSession, bot: Bot, data: dict):
 async def main():
     engine = create_async_engine(config.DATABASE_URL, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
+
     async with async_session() as session:
         await session.execute(delete(User).where(User.telegram_id < 0))
         await session.commit()
