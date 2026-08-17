@@ -80,9 +80,9 @@ async def start_edit(callback: CallbackQuery, state: FSMContext):
         "goal": ("Выберите новую цель:", ProfileEditState.goal),
         "interests": ("Выберите новые интересы:", ProfileEditState.interests),
         "games": ("Выберите новые игры:", ProfileEditState.games),
-        "preferred_gender": ("Выберите предпочитаемый пол партнёра:", ProfileEditState.preferred_gender),
         "bio": ("Введите новое био (до 500 символов):", ProfileEditState.bio),
         "photo": ("Отправьте новое фото:", ProfileEditState.photo),
+        "preferred_gender": ("Выберите предпочитаемый пол партнёра:", ProfileEditState.preferred_gender),
     }
     if field not in field_map:
         await callback.answer("Неизвестное поле")
@@ -143,7 +143,7 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
     await state.update_data(city=city)
     await finish_edit(message, state, session)
 
-# === Обработчики для жанров (категории) ===
+# === Обработчики для жанров ===
 @router.callback_query(F.data.startswith("genre_cat_"), StateFilter(ProfileEditState.genres))
 async def edit_genre_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data[len("genre_cat_"):]
@@ -225,16 +225,11 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     await state.update_data(goal=goal_map.get(goal, goal))
     await finish_edit(callback, state, session)
 
-# === Обработчики для предпочитаемого пола партнёра ===
-@router.callback_query(F.data == "edit_preferred_gender")
-async def edit_preferred_gender(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(ProfileEditState.preferred_gender)
-    await edit_or_caption(callback, "Выберите предпочитаемый пол партнёра:", reply_markup=preferred_gender_keyboard())
-    await callback.answer()
-
+# === Предпочитаемый пол партнёра (ИСПРАВЛЕН) ===
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
 async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_")[1]
+    # Исправлено: берём последний элемент после разделения, потому что callback_data = "pref_gender_Мужской"
+    gender = callback.data.split("_", 2)[2]  # или split("_")[2]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         user.preferred_gender = gender
@@ -434,6 +429,7 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
     for key, value in update_data.items():
         if hasattr(user, key):
             setattr(user, key, value)
+    # Явное сохранение полей с несовпадающими именами
     if "genres" in data:
         user.favorite_genres = data["genres"]
     if "bands" in data:
