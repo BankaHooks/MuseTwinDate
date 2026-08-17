@@ -69,8 +69,8 @@ async def profile_edit_menu(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("edit_"))
 async def start_edit(callback: CallbackQuery, state: FSMContext):
-    field = callback.data.split("_")[1]
-    logger.info(f"start_edit: callback_data={callback.data}, field={field}")  # для отладки
+    # Берём всё после "edit_", чтобы получить полное имя поля (включая подчёркивания)
+    field = callback.data[5:]
     field_map = {
         "name": ("Введите новое имя:", ProfileEditState.name),
         "age": ("Введите новый возраст (16-99):", ProfileEditState.age),
@@ -144,7 +144,7 @@ async def edit_city(message: Message, state: FSMContext, session: AsyncSession):
     await state.update_data(city=city)
     await finish_edit(message, state, session)
 
-# === Обработчики для жанров ===
+# === Жанры ===
 @router.callback_query(F.data.startswith("genre_cat_"), StateFilter(ProfileEditState.genres))
 async def edit_genre_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data[len("genre_cat_"):]
@@ -229,7 +229,8 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
 # === Предпочитаемый пол партнёра ===
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
 async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    gender = callback.data.split("_", 2)[2]  # "Мужской", "Женский" или "Любой"
+    # callback_data = "pref_gender_Мужской", берём всё после "pref_gender_"
+    gender = callback.data[len("pref_gender_"):]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         user.preferred_gender = gender
@@ -240,7 +241,7 @@ async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, sessi
     else:
         await callback.answer("Ошибка")
 
-# === Обработчики для интересов ===
+# === Интересы ===
 @router.callback_query(F.data.startswith("cat_"), StateFilter(ProfileEditState.interests))
 async def edit_interest_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data[len("cat_"):]
@@ -288,7 +289,7 @@ async def edit_interests_done(callback: CallbackQuery, state: FSMContext, sessio
     await state.update_data(interests=", ".join(selected))
     await finish_edit(callback, state, session)
 
-# === Обработчики для игр ===
+# === Игры ===
 @router.callback_query(F.data.startswith("gamecat_"), StateFilter(ProfileEditState.games))
 async def edit_games_category(callback: CallbackQuery, state: FSMContext):
     category = callback.data[len("gamecat_"):]
