@@ -9,7 +9,9 @@ from database import crud
 from database.models import User
 from config import config
 from utils.helpers import format_user_card
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router()
 ADMIN_IDS = config.ADMIN_IDS
 
@@ -100,6 +102,8 @@ async def admin_users_menu(callback: CallbackQuery, session: AsyncSession):
     premium = await session.scalar(select(func.count()).select_from(User).where(User.is_premium == True))
     hidden = await session.scalar(select(func.count()).select_from(User).where(User.is_hidden == True))
     banned = await session.scalar(select(func.count()).select_from(User).where(User.is_banned == True))
+    blocked_bot = await session.scalar(select(func.count()).select_from(User).where(User.blocked_bot == True))
+
     text = (f"📊 Статистика:\n"
             f"Всего: {total}\n"
             f"Мужчин: {male}\n"
@@ -107,7 +111,8 @@ async def admin_users_menu(callback: CallbackQuery, session: AsyncSession):
             f"Активных (7 дней): {active}\n"
             f"Премиум: {premium}\n"
             f"Скрытых: {hidden}\n"
-            f"Забаненных: {banned}")
+            f"Забаненных: {banned}\n"
+            f"Заблокировали бота: {blocked_bot}")
     buttons = [
         [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users_list_all_0")],
         [InlineKeyboardButton(text="👨 Мужчины", callback_data="admin_users_list_male_0")],
@@ -148,6 +153,8 @@ async def admin_users_list(callback: CallbackQuery, session: AsyncSession):
             status += "🔒 "
         if u.is_premium:
             status += "⭐ "
+        if u.blocked_bot:
+            status += "🚫 "
         text += f"ID {u.id}: {status}{name} ({(u.username) and '@'+u.username or 'нет юза'})\n"
         buttons.append([InlineKeyboardButton(
             text=f"👤 {name}",
@@ -249,8 +256,10 @@ async def admin_send(callback: CallbackQuery, state: FSMContext, session: AsyncS
         try:
             await callback.bot.send_message(user.telegram_id, text)
             count += 1
-        except:
-            pass
+        except Exception as e:
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, user.id)
+            # Игнорируем другие ошибки
     await callback.message.edit_text(f"Уведомление отправлено {count} пользователям.")
     await callback.answer()
     await state.clear()
@@ -294,13 +303,18 @@ async def admin_premium_set(message: Message, state: FSMContext, session: AsyncS
         await message.answer("Пользователь не найден.")
         return
     await crud.set_premium(session, user.id, months)
+    # Пробуем отправить уведомление, но если пользователь заблокировал бота, фиксируем это
     try:
         await message.bot.send_message(
             user.telegram_id,
             f"🎉 Вы получили премиум статус, поздравляем!\n\nДлительность: {months} месяцев"
         )
     except Exception as e:
-        await message.answer(f"Не удалось отправить уведомление пользователю: {e}")
+        if "blocked" in str(e).lower():
+            await crud.set_user_blocked_bot(session, user.id)
+            await message.answer(f"⚠️ Пользователь заблокировал бота, но премиум выдан.")
+        else:
+            await message.answer(f"Не удалось отправить уведомление: {e}")
     await message.answer(f"Премиум выдан пользователю {user.name or user.username} на {months} месяцев.")
     await state.clear()
 

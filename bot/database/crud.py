@@ -315,3 +315,9 @@ async def get_users_by_game(session: AsyncSession, game: str, exclude_user_id: i
                 if len(filtered) >= limit:
                     break
     return filtered
+
+async def set_user_blocked_bot(session: AsyncSession, user_id: int):
+    user = await get_user_by_id(session, user_id)
+    if user:
+        user.blocked_bot = True
+        await session.commit()

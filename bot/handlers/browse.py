@@ -98,7 +98,6 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
     if not user:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
-    # Удаляем и скипы, и лайки, чтобы показать всех заново
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
     await session.execute(delete(Like).where(Like.from_user_id == user.id))
     await session.commit()
@@ -141,7 +140,9 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
             candidate.last_like_notification_count = count
             await session.commit()
         except Exception as e:
-            logger.error(f"Failed to send like count notification: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, candidate.id)
+            # Игнорируем другие ошибки
 
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
@@ -154,14 +155,20 @@ async def like_callback(callback: CallbackQuery, state: FSMContext, session: Asy
                 f"💞 Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\nНапишите ему: {user_link}"
             )
         except Exception as e:
-            logger.error(f"Mutual like to candidate failed: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, candidate.id)
+            else:
+                logger.error(f"Mutual like to candidate failed: {e}")
         try:
             await callback.bot.send_message(
                 user.telegram_id,
                 f"💞 Взаимный лайк! Вы и {safe_candidate_name} понравились друг другу.\nНапишите ему: {candidate_link}"
             )
         except Exception as e:
-            logger.error(f"Mutual like to user failed: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, user.id)
+            else:
+                logger.error(f"Mutual like to user failed: {e}")
         await callback.answer("Это взаимно! 💞")
     else:
         await callback.answer("Лайк поставлен!")
@@ -238,7 +245,10 @@ async def send_envelope_text(message: Message, state: FSMContext, session: Async
         )
         await message.answer(f"Лайк отправлен! Сообщение: {text}")
     except Exception as e:
-        await message.answer("Не удалось отправить сообщение.")
+        if "blocked" in str(e).lower():
+            await crud.set_user_blocked_bot(session, target.id)
+        else:
+            await message.answer("Не удалось отправить сообщение.")
     if like.is_mutual:
         pass
     await state.clear()

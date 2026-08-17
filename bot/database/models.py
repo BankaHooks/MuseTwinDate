@@ -51,6 +51,7 @@ class User(Base):
     blocks_received = relationship("Block", foreign_keys="Block.blocked_id", back_populates="blocked")
     reports_sent = relationship("Report", foreign_keys="Report.reporter_id", back_populates="reporter")
     referrer = relationship("User", remote_side=[id], foreign_keys=[referred_by])
+    blocked_bot = Column(Boolean, default=False)
 
 class Like(Base):
     __tablename__ = "likes"

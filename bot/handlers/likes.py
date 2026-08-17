@@ -113,7 +113,9 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
             target.last_like_notification_count = count
             await session.commit()
         except Exception as e:
-            logger.error(f"Failed to send like count notification: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, target.id)
+            # Игнорируем другие ошибки
 
     if like.is_mutual:
         safe_user_name = escape_markdown(user.name or user.username or "Пользователь")
@@ -125,17 +127,21 @@ async def like_back_callback(callback: CallbackQuery, state: FSMContext, session
                 target.telegram_id,
                 f"💞 Взаимный лайк! Вы и {safe_user_name} понравились друг другу.\nНапишите ему: {user_link}"
             )
-            logger.info(f"Mutual like notification sent to {target.telegram_id}")
         except Exception as e:
-            logger.error(f"Failed to send mutual like to target {target.telegram_id}: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, target.id)
+            else:
+                logger.error(f"Failed to send mutual like to target {target.telegram_id}: {e}")
         try:
             await callback.bot.send_message(
                 user.telegram_id,
                 f"💞 Взаимный лайк! Вы и {safe_target_name} понравились друг другу.\nНапишите ему: {target_link}"
             )
-            logger.info(f"Mutual like notification sent to {user.telegram_id}")
         except Exception as e:
-            logger.error(f"Failed to send mutual like to user {user.telegram_id}: {e}")
+            if "blocked" in str(e).lower():
+                await crud.set_user_blocked_bot(session, user.id)
+            else:
+                logger.error(f"Failed to send mutual like to user {user.telegram_id}: {e}")
         await callback.answer("Это взаимно! 💞")
     else:
         await callback.answer("Вы лайкнули в ответ!")

@@ -387,7 +387,10 @@ async def blind_date(callback: CallbackQuery, session: AsyncSession):
     try:
         await callback.bot.send_message(partner.telegram_id, partner_text, reply_markup=partner_markup, parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"Не удалось отправить приглашение партнёру: {e}")
+        if "blocked" in str(e).lower():
+            await crud.set_user_blocked_bot(session, partner.id)
+        else:
+            logger.error(f"Не удалось отправить приглашение партнёру: {e}")
 
     asyncio.create_task(blind_date_timeout(blind_date_obj.id, callback.bot, session.bind))
 
@@ -458,13 +461,14 @@ async def blind_date_cancel(callback: CallbackQuery, session: AsyncSession):
     other = await crud.get_user_by_id(session, other_id)
     try:
         await callback.bot.send_message(other.telegram_id, "❌ Свидание отменено другим участником.")
-    except: pass
+    except Exception as e:
+        if "blocked" in str(e).lower():
+            await crud.set_user_blocked_bot(session, other.id)
     await session.delete(blind_date)
     await session.commit()
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Свидание отменено.")
     await callback.answer()
-
 # ==================== Поиск союзника в игру ====================
 
 @router.callback_query(F.data == "find_gaming_buddy")
