@@ -295,6 +295,8 @@ from utils.helpers import parse_comma_separated
 from utils.helpers import parse_comma_separated
 
 async def get_users_by_game(session: AsyncSession, game: str, exclude_user_id: int, limit: int = 10) -> List[User]:
+    from utils.helpers import parse_comma_separated
+    game_norm = game.lower().strip()
     stmt = select(User).where(
         User.id != exclude_user_id,
         User.is_banned == False,
@@ -308,7 +310,7 @@ async def get_users_by_game(session: AsyncSession, game: str, exclude_user_id: i
     for u in users:
         if u.favorite_games:
             games_set = parse_comma_separated(u.favorite_games)
-            if game in games_set:
+            if game_norm in games_set:
                 filtered.append(u)
                 if len(filtered) >= limit:
                     break

@@ -487,12 +487,13 @@ async def gaming_category_chosen(callback: CallbackQuery):
 async def gaming_game_chosen(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     game = callback.data[len("gaming_game_"):]
     game = game.replace('_', ' ').strip()
+    game_norm = game.lower().strip()
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if not user:
         await callback.answer("Ошибка")
         return
 
-    players = await crud.get_users_by_game(session, game, user.id, limit=10)
+    players = await crud.get_users_by_game(session, game_norm, user.id, limit=10)
     if not players:
         await edit_or_caption(callback,
             f"🎮 По игре «{game}» никого не найдено.\nПопробуйте другую игру.",

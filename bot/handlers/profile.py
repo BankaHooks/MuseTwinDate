@@ -69,7 +69,6 @@ async def profile_edit_menu(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("edit_"))
 async def start_edit(callback: CallbackQuery, state: FSMContext):
-    # Берём всё после "edit_", чтобы получить полное имя поля (включая подчёркивания)
     field = callback.data[5:]
     field_map = {
         "name": ("Введите новое имя:", ProfileEditState.name),
@@ -226,17 +225,16 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     await state.update_data(goal=goal_map.get(goal, goal))
     await finish_edit(callback, state, session)
 
-# === Предпочитаемый пол партнёра ===
+# === Предпочитаемый пол партнёра (исправлен) ===
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
 async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    # callback_data = "pref_gender_Мужской", берём всё после "pref_gender_"
     gender = callback.data[len("pref_gender_"):]
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         user.preferred_gender = gender
         await session.commit()
         await callback.answer(f"Пол установлен: {gender}")
-        await callback.message.delete()
+        # Не удаляем сообщение, показываем профиль в том же сообщении
         await show_profile(callback, session)
     else:
         await callback.answer("Ошибка")
