@@ -70,6 +70,7 @@ async def profile_edit_menu(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("edit_"))
 async def start_edit(callback: CallbackQuery, state: FSMContext):
     field = callback.data.split("_")[1]
+    logger.info(f"start_edit: callback_data={callback.data}, field={field}")  # для отладки
     field_map = {
         "name": ("Введите новое имя:", ProfileEditState.name),
         "age": ("Введите новый возраст (16-99):", ProfileEditState.age),
@@ -225,11 +226,10 @@ async def edit_goal(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     await state.update_data(goal=goal_map.get(goal, goal))
     await finish_edit(callback, state, session)
 
-# === Предпочитаемый пол партнёра (ИСПРАВЛЕН) ===
+# === Предпочитаемый пол партнёра ===
 @router.callback_query(F.data.startswith("pref_gender_"), StateFilter(ProfileEditState.preferred_gender))
 async def set_preferred_gender(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    # Исправлено: берём последний элемент после разделения, потому что callback_data = "pref_gender_Мужской"
-    gender = callback.data.split("_", 2)[2]  # или split("_")[2]
+    gender = callback.data.split("_", 2)[2]  # "Мужской", "Женский" или "Любой"
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         user.preferred_gender = gender
@@ -449,4 +449,4 @@ async def finish_edit(event: Union[Message, CallbackQuery], state: FSMContext, s
         await show_profile_for_message(event, session)
     else:
         await event.answer("Профиль обновлён!")
-        await show_profile(event, session)  
+        await show_profile(event, session)
