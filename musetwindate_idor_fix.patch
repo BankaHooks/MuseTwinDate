@@ -1,0 +1,44 @@
+diff --git a/bot/handlers/ai.py b/bot/handlers/ai.py
+index df28426..3398718 100644
+--- a/bot/handlers/ai.py
++++ b/bot/handlers/ai.py
+@@ -484,7 +484,7 @@ async def gaming_category_chosen(callback: CallbackQuery):
+     await callback.answer()
+ 
+ @router.callback_query(F.data.startswith("gaming_game_"))
+-async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
++async def gaming_game_chosen(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+     game = callback.data[len("gaming_game_"):]
+     game = game.replace('_', ' ').strip()
+     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+@@ -503,6 +503,8 @@ async def gaming_game_chosen(callback: CallbackQuery, session: AsyncSession):
+         await callback.answer()
+         return
+ 
++    await state.update_data(gaming_results=[p.id for p in players])
++
+     text = f"🎮 Найдены союзники по игре «{game}»:\n\n"
+     buttons = []
+     for p in players:
+@@ -535,14 +537,19 @@ async def no_username(callback: CallbackQuery):
+     await callback.answer("У этого пользователя нет username.", show_alert=True)
+ 
+ @router.callback_query(F.data.startswith("view_user_"))
+-async def view_user_profile(callback: CallbackQuery, session: AsyncSession):
++async def view_user_profile(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+     if not user or not user.is_premium:
+         await callback.answer("Доступно только для премиум!", show_alert=True)
+         return
+     user_id = int(callback.data.split("_")[2])
++    data = await state.get_data()
++    allowed_ids = data.get("gaming_results", [])
++    if user_id not in allowed_ids:
++        await callback.answer("Эта анкета больше недоступна. Повторите поиск.", show_alert=True)
++        return
+     user_obj = await crud.get_user_by_id(session, user_id)
+-    if not user_obj:
++    if not user_obj or user_obj.is_banned or user_obj.is_hidden:
+         await callback.answer("Пользователь не найден.")
+         return
+     from utils.helpers import format_user_card
