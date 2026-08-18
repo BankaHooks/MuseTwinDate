@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message, InlineKeyboardMarkup, InlineKeyboardButton
-from sqlalchemy import delete
+from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import crud
 from database.models import Skip, Like
@@ -99,7 +99,7 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
         return
     await session.execute(delete(Skip).where(Skip.user_id == user.id))
-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
+    await session.execute(delete(Like).where(and_(Like.from_user_id == user.id, Like.is_mutual == False)))
     await session.commit()
     await state.clear()
     await callback.message.delete()

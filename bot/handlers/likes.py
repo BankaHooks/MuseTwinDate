@@ -154,10 +154,18 @@ async def skip_like(callback: CallbackQuery, state: FSMContext, session: AsyncSe
     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
     if user:
         await crud.create_skip(session, user.id, target_id)
-    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+    data = await state.get_data()
+    idx = data.get("current_index", 0)
+    await state.update_data(current_index=idx + 1)
+    await show_like_card(callback.message, state, session, edit=True)
     await callback.answer()
 
 @router.callback_query(F.data == "likes_back")
 async def likes_back(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
+    await state.clear()
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
     await callback.answer()

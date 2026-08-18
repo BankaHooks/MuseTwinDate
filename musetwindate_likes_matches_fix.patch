@@ -1,0 +1,48 @@
+diff --git a/bot/handlers/browse.py b/bot/handlers/browse.py
+index ce2ca9f..bdff184 100644
+--- a/bot/handlers/browse.py
++++ b/bot/handlers/browse.py
+@@ -3,7 +3,7 @@ from aiogram import Router, F
+ from aiogram.filters import Command
+ from aiogram.fsm.context import FSMContext
+ from aiogram.types import CallbackQuery, InputMediaPhoto, Message, InlineKeyboardMarkup, InlineKeyboardButton
+-from sqlalchemy import delete
++from sqlalchemy import delete, and_
+ from sqlalchemy.ext.asyncio import AsyncSession
+ from database import crud
+ from database.models import Skip, Like
+@@ -99,7 +99,7 @@ async def show_all_callback(callback: CallbackQuery, state: FSMContext, session:
+         await callback.answer("Зарегистрируйтесь через /start", show_alert=True)
+         return
+     await session.execute(delete(Skip).where(Skip.user_id == user.id))
+-    await session.execute(delete(Like).where(Like.from_user_id == user.id))
++    await session.execute(delete(Like).where(and_(Like.from_user_id == user.id, Like.is_mutual == False)))
+     await session.commit()
+     await state.clear()
+     await callback.message.delete()
+diff --git a/bot/handlers/likes.py b/bot/handlers/likes.py
+index e0fc2e6..302352c 100644
+--- a/bot/handlers/likes.py
++++ b/bot/handlers/likes.py
+@@ -154,10 +154,18 @@ async def skip_like(callback: CallbackQuery, state: FSMContext, session: AsyncSe
+     user = await crud.get_user_by_telegram_id(session, callback.from_user.id)
+     if user:
+         await crud.create_skip(session, user.id, target_id)
+-    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
++    data = await state.get_data()
++    idx = data.get("current_index", 0)
++    await state.update_data(current_index=idx + 1)
++    await show_like_card(callback.message, state, session, edit=True)
+     await callback.answer()
+ 
+ @router.callback_query(F.data == "likes_back")
+ async def likes_back(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+-    await show_likes(callback.message, callback.from_user.id, state, session, delete_old=True)
++    await state.clear()
++    try:
++        await callback.message.delete()
++    except:
++        pass
++    await callback.message.answer("Главное меню:", reply_markup=main_reply_keyboard())
+     await callback.answer()
+\ No newline at end of file
